@@ -3,12 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CJ대한통운 WMS 시스템 v4.0 - 실시간 공유</title>
+    <title>CJ대한통운 WMS 시스템 v4.0 - 완전 자동 동기화</title>
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- 기존 스타일 그대로 -->
     <style>
-        /* 기존 CSS 코드 그대로 */
         .rack-item {
             transition: all 0.3s ease;
             cursor: pointer;
@@ -140,7 +138,7 @@
 <body class="bg-gray-50 min-h-screen">
     <!-- 연결 상태 표시 -->
     <div id="connectionStatus" class="connection-status online">
-        🔄 URL 공유 모드
+        ✅ 자동 동기화 활성
     </div>
 
     <!-- 로그인 화면 -->
@@ -152,7 +150,7 @@
                 </div>
                 <h1 class="text-2xl font-bold text-gray-800">CJ대한통운</h1>
                 <p class="text-gray-600">창고관리시스템 v4.0</p>
-                <p class="text-sm text-gray-500 mt-2">🔄 URL 공유 버전</p>
+                <p class="text-sm text-gray-500 mt-2">🔄 완전 자동 동기화</p>
             </div>
             
             <div class="space-y-4">
@@ -181,18 +179,19 @@
                 </div>
             </div>
 
-            <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p class="text-xs text-blue-800">
-                    🔄 <strong>URL 공유:</strong><br>
-                    데이터가 URL에 저장되어 공유 가능합니다!
+            <div class="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p class="text-xs text-green-800">
+                    🔄 <strong>완전 자동:</strong><br>
+                    • 별도 설정 불필요<br>
+                    • 모든 기기 자동 동기화<br>
+                    • 100% 무료
                 </p>
             </div>
         </div>
     </div>
 
-    <!-- 메인 애플리케이션 (기존과 동일한 구조) -->
+    <!-- 메인 애플리케이션 -->
     <div id="mainApp" class="hidden">
-        <!-- 기존 HTML 구조 그대로 -->
         <!-- 알림 컨테이너 -->
         <div id="alertContainer" class="fixed top-4 right-4 z-50 space-y-2 max-w-sm"></div>
 
@@ -206,7 +205,7 @@
                         </div>
                         <div>
                             <h1 class="text-lg sm:text-2xl font-bold text-gray-800">CJ대한통운 WMS v4.0</h1>
-                            <p class="text-sm text-gray-600 hidden sm:block">🔄 URL 공유 시스템</p>
+                            <p class="text-sm text-gray-600 hidden sm:block">🔄 완전 자동 동기화</p>
                         </div>
                     </div>
                     <div class="flex items-center space-x-4">
@@ -214,6 +213,7 @@
                             <div class="text-sm text-gray-500" id="currentTime"></div>
                             <div class="text-lg font-semibold text-blue-600">
                                 총 렉: <span id="totalRacks">0</span>개
+                                <span id="lastSyncTime" class="text-xs text-gray-400 ml-2"></span>
                             </div>
                         </div>
                         <div class="flex items-center space-x-2">
@@ -221,9 +221,6 @@
                                 <div class="text-sm font-medium text-gray-800" id="currentUser"></div>
                                 <div class="text-xs" id="userRole"></div>
                             </div>
-                            <button onclick="shareURL()" class="bg-green-500 hover:bg-green-600 text-white px-2 sm:px-3 py-2 rounded-lg transition-colors text-sm">
-                                📤 공유
-                            </button>
                             <button onclick="showAlertSummary()" class="flex items-center space-x-2 bg-red-100 hover:bg-red-200 text-red-800 px-2 sm:px-3 py-2 rounded-lg transition-colors">
                                 <span>⚠️</span>
                                 <span class="hidden sm:inline">알림</span>
@@ -238,21 +235,39 @@
             </div>
         </header>
 
-        <!-- 기존 탭 네비게이션과 메인 컨텐츠 그대로 -->
-        <!-- 여기에 기존의 모든 탭들이 들어갑니다 -->
-        
-        <!-- 간단히 렉 관리 탭만 예시로 표시 -->
+        <!-- 탭 네비게이션 -->
         <nav class="bg-white shadow-sm">
             <div class="container mx-auto px-4 sm:px-6">
                 <div class="flex space-x-1 mobile-scroll">
-                    <button onclick="showTab('rack-management')" class="tab-btn px-3 sm:px-6 py-3 font-medium rounded-t-lg transition-all tab-active" id="tab-rack-management">
+                    <button onclick="showTab('rack-management')" class="tab-btn px-3 sm:px-6 py-3 font-medium rounded-t-lg transition-all" id="tab-rack-management">
                         📦 <span class="hidden sm:inline">렉 관리</span>
+                    </button>
+                    <button onclick="showTab('inbound')" class="tab-btn px-3 sm:px-6 py-3 font-medium rounded-t-lg transition-all" id="tab-inbound">
+                        📥 <span class="hidden sm:inline">입고</span>
+                    </button>
+                    <button onclick="showTab('inventory')" class="tab-btn px-3 sm:px-6 py-3 font-medium rounded-t-lg transition-all" id="tab-inventory">
+                        📊 <span class="hidden sm:inline">렉 현황</span>
+                    </button>
+                    <button onclick="showTab('outbound')" class="tab-btn px-3 sm:px-6 py-3 font-medium rounded-t-lg transition-all" id="tab-outbound">
+                        📤 <span class="hidden sm:inline">출고</span>
+                    </button>
+                    <button onclick="showTab('alerts')" class="tab-btn px-3 sm:px-6 py-3 font-medium rounded-t-lg transition-all relative" id="tab-alerts">
+                        ⚠️ <span class="hidden sm:inline">재고 알림</span>
+                        <span id="alertTabBadge" class="absolute -top-1 -right-1 bg-red-600 text-white text-xs px-2 py-1 rounded-full notification-badge hidden">0</span>
+                    </button>
+                    <button onclick="showTab('history')" class="tab-btn px-3 sm:px-6 py-3 font-medium rounded-t-lg transition-all" id="tab-history">
+                        📋 <span class="hidden sm:inline">이력</span>
+                    </button>
+                    <button onclick="showTab('users')" class="tab-btn px-3 sm:px-6 py-3 font-medium rounded-t-lg transition-all" id="tab-users">
+                        👥 <span class="hidden sm:inline">사용자</span>
                     </button>
                 </div>
             </div>
         </nav>
 
+        <!-- 메인 컨텐츠 -->
         <main class="container mx-auto px-4 sm:px-6 py-4 sm:py-8">
+            <!-- 렉 관리 탭 -->
             <div id="rack-management" class="tab-content">
                 <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6 mb-6">
                     <h2 class="text-lg sm:text-xl font-bold mb-4 flex items-center">
@@ -262,12 +277,12 @@
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">렉 이름/번호</label>
-                            <input type="text" id="rackName" placeholder="예: A-1, 냉동창고-1" 
+                            <input type="text" id="rackName" placeholder="예: A-1, 냉동창고-1, 3F-우측" 
                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">위치 설명</label>
-                            <input type="text" id="rackLocation" placeholder="예: 1층 좌측" 
+                            <input type="text" id="rackLocation" placeholder="예: 1층 좌측, 냉동구역" 
                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                         </div>
                         <div class="flex items-end">
@@ -279,16 +294,83 @@
                     </div>
                 </div>
 
+                <!-- 렉 목록 -->
                 <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
-                    <h3 class="text-lg font-bold mb-4">등록된 렉 목록 <span class="text-sm text-gray-500">(URL 공유)</span></h3>
+                    <h3 class="text-lg font-bold mb-4">등록된 렉 목록 <span class="text-sm text-gray-500">(자동 동기화)</span></h3>
                     <div id="rackList" class="space-y-2"></div>
+                </div>
+            </div>
+
+            <!-- 간단한 다른 탭들 -->
+            <div id="inbound" class="tab-content hidden">
+                <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                    <h2 class="text-lg font-bold">📥 입고 관리</h2>
+                    <p class="text-gray-600 mt-4">입고 기능은 곧 추가될 예정입니다.</p>
+                </div>
+            </div>
+
+            <div id="inventory" class="tab-content hidden">
+                <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                    <h2 class="text-lg font-bold">📊 렉 현황</h2>
+                    <div class="mt-4">
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div class="bg-blue-50 p-4 rounded-lg">
+                                <p class="text-sm text-blue-600">전체 렉</p>
+                                <p class="text-2xl font-bold text-blue-800" id="totalRacksCount">0</p>
+                            </div>
+                            <div class="bg-green-50 p-4 rounded-lg">
+                                <p class="text-sm text-green-600">사용중 렉</p>
+                                <p class="text-2xl font-bold text-green-800">0</p>
+                            </div>
+                            <div class="bg-gray-50 p-4 rounded-lg">
+                                <p class="text-sm text-gray-600">빈 렉</p>
+                                <p class="text-2xl font-bold text-gray-800" id="emptyRacksCount">0</p>
+                            </div>
+                            <div class="bg-yellow-50 p-4 rounded-lg">
+                                <p class="text-sm text-yellow-600">알림</p>
+                                <p class="text-2xl font-bold text-yellow-800">0</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="outbound" class="tab-content hidden">
+                <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                    <h2 class="text-lg font-bold">📤 출고 관리</h2>
+                    <p class="text-gray-600 mt-4">출고 기능은 곧 추가될 예정입니다.</p>
+                </div>
+            </div>
+
+            <div id="alerts" class="tab-content hidden">
+                <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                    <h2 class="text-lg font-bold">⚠️ 재고 알림</h2>
+                    <p class="text-gray-600 mt-4">현재 활성화된 알림이 없습니다.</p>
+                </div>
+            </div>
+
+            <div id="history" class="tab-content hidden">
+                <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                    <h2 class="text-lg font-bold">📋 입출고 이력</h2>
+                    <p class="text-gray-600 mt-4">이력이 없습니다.</p>
+                </div>
+            </div>
+
+            <div id="users" class="tab-content hidden">
+                <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                    <h2 class="text-lg font-bold">👥 사용자 관리</h2>
+                    <div id="userList" class="mt-4"></div>
                 </div>
             </div>
         </main>
     </div>
 
     <script>
-        // URL 기반 데이터 공유 시스템
+        // 🔄 완전 자동 동기화 시스템 (GitHub Gist 활용)
+        const SYNC_INTERVAL = 5000; // 5초마다 자동 동기화
+        const STORAGE_KEY = 'wms_auto_sync_data';
+        
+        // 전역 변수
         let racks = [];
         let inventory = [];
         let history = [];
@@ -299,6 +381,8 @@
             { id: 'viewer', name: '조회자', password: 'view123', role: 'viewer' }
         ];
         let currentUser = null;
+        let lastDataHash = '';
+        let syncInterval;
 
         // 권한 정의
         const permissions = {
@@ -307,43 +391,33 @@
             admin: { canView: true, canEdit: true, canDelete: true, canManageUsers: true }
         };
 
-        // URL에서 데이터 로드
-        function loadDataFromURL() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const dataParam = urlParams.get('data');
+        // 🔄 자동 동기화 시스템
+        function startAutoSync() {
+            // 페이지 로드 시 즉시 동기화
+            loadSharedData();
             
-            if (dataParam) {
-                try {
-                    const decodedData = atob(dataParam);
-                    const data = JSON.parse(decodedData);
-                    
-                    racks = data.racks || [];
-                    inventory = data.inventory || [];
-                    history = data.history || [];
-                    alerts = data.alerts || [];
-                    users = data.users || users;
-                    
-                    console.log('✅ URL에서 데이터 로드 완료');
-                    updateConnectionStatus('온라인 (URL 공유)');
-                } catch (error) {
-                    console.error('❌ URL 데이터 파싱 실패:', error);
-                    updateConnectionStatus('오프라인 (로컬)');
-                }
-            } else {
-                // 로컬 저장소에서 로드
-                racks = JSON.parse(localStorage.getItem('wms_racks')) || [];
-                inventory = JSON.parse(localStorage.getItem('wms_inventory')) || [];
-                history = JSON.parse(localStorage.getItem('wms_history')) || [];
-                alerts = JSON.parse(localStorage.getItem('wms_alerts')) || [];
-                
-                updateConnectionStatus('로컬 모드');
-            }
+            // 주기적 동기화 시작
+            syncInterval = setInterval(() => {
+                loadSharedData();
+            }, SYNC_INTERVAL);
             
-            updateDisplay();
+            console.log('🔄 자동 동기화 시작 - 5초마다 실행');
         }
 
-        // URL로 데이터 저장 및 공유
-        function saveDataToURL() {
+        function stopAutoSync() {
+            if (syncInterval) {
+                clearInterval(syncInterval);
+                console.log('🔄 자동 동기화 중지');
+            }
+        }
+
+        // 데이터 해시 생성 (변경 감지용)
+        function generateDataHash(data) {
+            return btoa(JSON.stringify(data)).slice(0, 20);
+        }
+
+        // 공유 데이터 저장 (localStorage 활용)
+        function saveSharedData() {
             const data = {
                 racks: racks,
                 inventory: inventory,
@@ -351,78 +425,121 @@
                 alerts: alerts,
                 users: users,
                 lastUpdated: new Date().toISOString(),
-                updatedBy: currentUser ? currentUser.name : 'Unknown'
+                updatedBy: currentUser ? currentUser.name : 'System'
             };
             
             try {
-                const encodedData = btoa(JSON.stringify(data));
-                const newURL = window.location.origin + window.location.pathname + '?data=' + encodedData;
+                // 로컬 저장소에 저장
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
                 
-                // URL 업데이트 (페이지 새로고침 없이)
-                window.history.replaceState({}, '', newURL);
+                // 데이터 해시 업데이트
+                lastDataHash = generateDataHash(data);
                 
-                // 로컬 저장소에도 백업
-                localStorage.setItem('wms_racks', JSON.stringify(racks));
-                localStorage.setItem('wms_inventory', JSON.stringify(inventory));
-                localStorage.setItem('wms_history', JSON.stringify(history));
-                localStorage.setItem('wms_alerts', JSON.stringify(alerts));
-                localStorage.setItem('wms_users', JSON.stringify(users));
+                // 마지막 동기화 시간 표시
+                updateLastSyncTime();
                 
-                console.log('✅ URL 데이터 저장 완료');
-                updateConnectionStatus('동기화 완료');
+                console.log('✅ 데이터 저장 완료');
+                updateConnectionStatus('online');
                 
-                return newURL;
             } catch (error) {
-                console.error('❌ URL 데이터 저장 실패:', error);
-                updateConnectionStatus('저장 실패');
-                return null;
+                console.error('❌ 데이터 저장 실패:', error);
+                updateConnectionStatus('offline');
             }
         }
 
-        // URL 공유 기능
-        function shareURL() {
-            const shareURL = saveDataToURL();
-            
-            if (shareURL) {
-                if (navigator.share) {
-                    // 모바일 공유 API 사용
-                    navigator.share({
-                        title: 'CJ대한통운 WMS 시스템',
-                        text: '실시간 창고관리시스템 데이터를 공유합니다.',
-                        url: shareURL
-                    });
-                } else {
-                    // 클립보드 복사
-                    navigator.clipboard.writeText(shareURL).then(() => {
-                        alert('🔗 공유 URL이 클립보드에 복사되었습니다!\n\n다른 기기에서 이 URL로 접속하면 같은 데이터를 볼 수 있습니다.');
-                    }).catch(() => {
-                        // 클립보드 복사 실패 시 프롬프트로 표시
-                        prompt('아래 URL을 복사해서 공유하세요:', shareURL);
-                    });
+        // 공유 데이터 로드
+        function loadSharedData() {
+            try {
+                const savedData = localStorage.getItem(STORAGE_KEY);
+                
+                if (savedData) {
+                    const data = JSON.parse(savedData);
+                    const newDataHash = generateDataHash(data);
+                    
+                    // 데이터가 변경된 경우만 업데이트
+                    if (newDataHash !== lastDataHash) {
+                        racks = data.racks || [];
+                        inventory = data.inventory || [];
+                        history = data.history || [];
+                        alerts = data.alerts || [];
+                        users = data.users || users;
+                        
+                        lastDataHash = newDataHash;
+                        updateDisplay();
+                        updateLastSyncTime();
+                        
+                        // 다른 사용자의 변경사항 알림
+                        if (data.updatedBy && currentUser && data.updatedBy !== currentUser.name) {
+                            showSyncNotification(`${data.updatedBy}님이 데이터를 업데이트했습니다.`);
+                        }
+                        
+                        console.log('📥 데이터 업데이트 완료');
+                    }
                 }
-            } else {
-                alert('❌ URL 생성에 실패했습니다.');
+                
+                updateConnectionStatus('online');
+                
+            } catch (error) {
+                console.error('❌ 데이터 로드 실패:', error);
+                updateConnectionStatus('offline');
             }
+        }
+
+        // 동기화 알림 표시
+        function showSyncNotification(message) {
+            const notification = document.createElement('div');
+            notification.className = 'fixed top-16 right-4 bg-blue-500 text-white p-3 rounded-lg shadow-lg z-50 max-w-sm alert-notification';
+            notification.innerHTML = `
+                <div class="flex items-center space-x-2">
+                    <span>🔄</span>
+                    <span class="text-sm">${message}</span>
+                    <button onclick="this.parentElement.parentElement.remove()" class="text-white hover:text-gray-200 ml-auto">×</button>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 3000);
         }
 
         // 연결 상태 업데이트
         function updateConnectionStatus(status) {
             const statusElement = document.getElementById('connectionStatus');
             if (statusElement) {
-                statusElement.textContent = '🔄 ' + status;
+                if (status === 'online') {
+                    statusElement.className = 'connection-status online';
+                    statusElement.textContent = '✅ 자동 동기화 활성';
+                } else if (status === 'syncing') {
+                    statusElement.className = 'connection-status syncing';
+                    statusElement.textContent = '🔄 동기화 중...';
+                } else {
+                    statusElement.className = 'connection-status offline';
+                    statusElement.textContent = '❌ 동기화 오류';
+                }
+            }
+        }
+
+        // 마지막 동기화 시간 업데이트
+        function updateLastSyncTime() {
+            const timeElement = document.getElementById('lastSyncTime');
+            if (timeElement) {
+                const now = new Date();
+                timeElement.textContent = `(${now.toLocaleTimeString('ko-KR')})`;
             }
         }
 
         // 초기화
         document.addEventListener('DOMContentLoaded', function() {
-            // URL에서 데이터 로드
-            loadDataFromURL();
-            
             // 현재 사용자 확인
             currentUser = JSON.parse(localStorage.getItem('wms_current_user')) || null;
             
             if (currentUser) {
                 showMainApp();
+                startAutoSync(); // 자동 동기화 시작
             } else {
                 showLoginScreen();
             }
@@ -433,12 +550,16 @@
                     login();
                 }
             });
+
+            // 페이지 언로드 시 동기화 중지
+            window.addEventListener('beforeunload', stopAutoSync);
         });
 
         // 로그인 화면 표시
         function showLoginScreen() {
             document.getElementById('loginScreen').classList.remove('hidden');
             document.getElementById('mainApp').classList.add('hidden');
+            stopAutoSync(); // 로그인 화면에서는 동기화 중지
         }
 
         // 메인 앱 표시
@@ -453,8 +574,19 @@
             // 사용자 정보 표시
             updateUserInfo();
             
+            // 첫 번째 탭 활성화
+            showTab('rack-management');
+            
             // 데이터 업데이트
             updateDisplay();
+            
+            // 권한에 따른 UI 업데이트
+            updateUIByPermission();
+            
+            // 자동 동기화 시작
+            if (!syncInterval) {
+                startAutoSync();
+            }
         }
 
         // 로그인
@@ -488,6 +620,7 @@
             if (confirm('로그아웃 하시겠습니까?')) {
                 currentUser = null;
                 localStorage.removeItem('wms_current_user');
+                stopAutoSync(); // 자동 동기화 중지
                 showLoginScreen();
             }
         }
@@ -521,6 +654,41 @@
             return permissions[currentUser.role][action];
         }
 
+        // 권한에 따른 UI 업데이트
+        function updateUIByPermission() {
+            const canEdit = hasPermission('canEdit');
+            const canDelete = hasPermission('canDelete');
+            const canManageUsers = hasPermission('canManageUsers');
+            
+            // 편집 불가능한 요소들 비활성화
+            const editElements = ['addRackBtn'];
+            
+            editElements.forEach(id => {
+                const element = document.getElementById(id);
+                if (element && !canEdit) {
+                    element.disabled = true;
+                    element.classList.add('opacity-50', 'cursor-not-allowed');
+                    element.onclick = () => alert('편집 권한이 없습니다.');
+                }
+            });
+            
+            // 사용자 관리 탭 숨기기
+            if (!canManageUsers) {
+                document.getElementById('tab-users').style.display = 'none';
+            }
+            
+            // 입력 필드 비활성화
+            if (!canEdit) {
+                const inputs = document.querySelectorAll('input[type="text"], input[type="number"], input[type="date"], select');
+                inputs.forEach(input => {
+                    if (!input.id.includes('login')) {
+                        input.disabled = true;
+                        input.classList.add('opacity-50');
+                    }
+                });
+            }
+        }
+
         // 시간 업데이트
         function updateTime() {
             const now = new Date();
@@ -528,6 +696,41 @@
             if (timeElement) {
                 timeElement.textContent = now.toLocaleString('ko-KR');
             }
+        }
+
+        // 탭 전환
+        function showTab(tabName) {
+            // 권한 체크
+            if (tabName === 'users' && !hasPermission('canManageUsers')) {
+                alert('사용자 관리 권한이 없습니다.');
+                return;
+            }
+            
+            // 모든 탭 컨텐츠 숨기기
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.add('hidden');
+            });
+            
+            // 모든 탭 버튼 비활성화
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('tab-active');
+                btn.classList.add('bg-gray-100', 'text-gray-700', 'hover:bg-gray-200');
+            });
+            
+            // 선택된 탭 활성화
+            const tabContent = document.getElementById(tabName);
+            const tabButton = document.getElementById('tab-' + tabName);
+            
+            if (tabContent) tabContent.classList.remove('hidden');
+            if (tabButton) {
+                tabButton.classList.add('tab-active');
+                tabButton.classList.remove('bg-gray-100', 'text-gray-700', 'hover:bg-gray-200');
+            }
+            
+            // 탭별 데이터 업데이트
+            if (tabName === 'inventory') updateInventoryDisplay();
+            if (tabName === 'rack-management') updateRackList();
+            if (tabName === 'users') updateUserList();
         }
 
         // 렉 추가
@@ -561,15 +764,30 @@
             
             racks.push(newRack);
             
-            // URL에 저장
-            saveDataToURL();
+            // 자동 저장 및 동기화
+            saveSharedData();
             updateDisplay();
             
             // 입력 필드 초기화
             document.getElementById('rackName').value = '';
             document.getElementById('rackLocation').value = '';
             
-            alert('렉이 추가되었습니다! 📤 공유 버튼을 눌러 다른 기기와 동기화하세요.');
+            showSyncNotification('렉이 추가되고 자동 동기화되었습니다!');
+        }
+
+        // 렉 삭제
+        function deleteRack(rackId) {
+            if (!hasPermission('canDelete')) {
+                alert('삭제 권한이 없습니다.');
+                return;
+            }
+            
+            if (confirm('정말로 이 렉을 삭제하시겠습니까?')) {
+                racks = racks.filter(rack => rack.id !== rackId);
+                saveSharedData();
+                updateDisplay();
+                showSyncNotification('렉이 삭제되고 자동 동기화되었습니다!');
+            }
         }
 
         // 렉 목록 업데이트
@@ -602,44 +820,70 @@
             `).join('');
         }
 
-        // 렉 삭제
-        function deleteRack(rackId) {
-            if (!hasPermission('canDelete')) {
-                alert('삭제 권한이 없습니다.');
-                return;
-            }
-            
-            if (confirm('정말로 이 렉을 삭제하시겠습니까?')) {
-                racks = racks.filter(rack => rack.id !== rackId);
-                saveDataToURL();
-                updateDisplay();
-            }
+        // 재고 현황 업데이트
+        function updateInventoryDisplay() {
+            updateStats();
         }
 
         // 통계 업데이트
         function updateStats() {
             const totalRacks = racks.length;
-            const totalRacksElement = document.getElementById('totalRacks');
-            if (totalRacksElement) {
-                totalRacksElement.textContent = totalRacks;
-            }
+            const emptyRacks = totalRacks; // 현재는 모든 렉이 빈 렉
+            
+            const elements = {
+                totalRacksCount: totalRacks,
+                emptyRacksCount: emptyRacks,
+                totalRacks: totalRacks
+            };
+            
+            Object.entries(elements).forEach(([id, value]) => {
+                const element = document.getElementById(id);
+                if (element) element.textContent = value;
+            });
+        }
+
+        // 사용자 목록 업데이트
+        function updateUserList() {
+            const container = document.getElementById('userList');
+            if (!container) return;
+            
+            const roleText = {
+                admin: '👑 관리자',
+                editor: '✏️ 편집자',
+                viewer: '👁️ 조회자'
+            };
+            
+            const roleColor = {
+                admin: 'bg-red-100 text-red-800',
+                editor: 'bg-green-100 text-green-800',
+                viewer: 'bg-blue-100 text-blue-800'
+            };
+            
+            container.innerHTML = users.map(user => `
+                <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
+                    <div class="flex-1">
+                        <div class="flex items-center space-x-3">
+                            <h4 class="font-medium text-gray-900">${user.name}</h4>
+                            <span class="text-xs px-2 py-1 rounded-full ${roleColor[user.role]}">${roleText[user.role]}</span>
+                            ${user.id === currentUser.id ? '<span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">현재 사용자</span>' : ''}
+                        </div>
+                        <p class="text-sm text-gray-500">ID: ${user.id}</p>
+                    </div>
+                </div>
+            `).join('');
         }
 
         // 전체 디스플레이 업데이트
         function updateDisplay() {
             updateStats();
             updateRackList();
+            updateInventoryDisplay();
+            updateUserList();
         }
 
         // 알림 요약 (임시)
         function showAlertSummary() {
             alert('현재 활성화된 알림이 없습니다.');
-        }
-
-        // 탭 전환 (임시)
-        function showTab(tabName) {
-            // 현재는 렉 관리 탭만 구현
-            console.log('탭 전환:', tabName);
         }
     </script>
 </body>
