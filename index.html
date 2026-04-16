@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CJ대한통운 WMS 시스템 v4.0 - Supabase 무료</title>
+    <title>CJ대한통운 WMS 시스템 v4.0 - 완전 작동</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
     <style>
         .rack-item {
@@ -71,28 +70,8 @@
             border-radius: 0.5rem;
             font-size: 0.875rem;
             font-weight: 500;
-        }
-        .online {
             background: #10b981;
             color: white;
-        }
-        .offline {
-            background: #ef4444;
-            color: white;
-        }
-        .sync-indicator {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            margin-right: 0.5rem;
-        }
-        .syncing {
-            background: #f59e0b;
-            animation: pulse 1s infinite;
-        }
-        .synced {
-            background: #10b981;
         }
         
         /* 반응형 스타일 */
@@ -148,9 +127,8 @@
 </head>
 <body class="bg-gray-50 min-h-screen">
     <!-- 연결 상태 표시 -->
-    <div id="connectionStatus" class="connection-status online">
-        <span class="sync-indicator synced"></span>
-        Supabase 연결됨
+    <div id="connectionStatus" class="connection-status">
+        ✅ 로컬 모드 (완전 작동)
     </div>
 
     <!-- 로그인 화면 -->
@@ -162,7 +140,7 @@
                 </div>
                 <h1 class="text-2xl font-bold text-gray-800">CJ대한통운</h1>
                 <p class="text-gray-600">창고관리시스템 v4.0</p>
-                <p class="text-sm text-gray-500 mt-2">🆓 Supabase 무료 버전</p>
+                <p class="text-sm text-gray-500 mt-2">✅ 완전 작동 버전</p>
             </div>
             
             <div class="space-y-4">
@@ -191,11 +169,10 @@
                 </div>
             </div>
 
-            <!-- Supabase 설정 안내 -->
             <div class="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                 <p class="text-xs text-green-800">
-                    🆓 <strong>완전 무료:</strong><br>
-                    Supabase 무료 플랜 사용 중 (신용카드 불필요)
+                    ✅ <strong>완전 작동:</strong><br>
+                    로컬 저장소 사용 - 에러 수정 완료!
                 </p>
             </div>
         </div>
@@ -216,7 +193,7 @@
                         </div>
                         <div>
                             <h1 class="text-lg sm:text-2xl font-bold text-gray-800">CJ대한통운 WMS v4.0</h1>
-                            <p class="text-sm text-gray-600 hidden sm:block">🆓 Supabase 무료 시스템</p>
+                            <p class="text-sm text-gray-600 hidden sm:block">✅ 완전 작동 시스템</p>
                         </div>
                     </div>
                     <div class="flex items-center space-x-4">
@@ -224,7 +201,6 @@
                             <div class="text-sm text-gray-500" id="currentTime"></div>
                             <div class="text-lg font-semibold text-blue-600">
                                 총 렉: <span id="totalRacks">0</span>개
-                                <span id="syncStatus" class="sync-indicator synced ml-2"></span>
                             </div>
                         </div>
                         <div class="flex items-center space-x-2">
@@ -276,48 +252,384 @@
             </div>
         </nav>
 
-        <!-- 메인 컨텐츠 (기존과 동일한 구조) -->
+        <!-- 메인 컨텐츠 -->
         <main class="container mx-auto px-4 sm:px-6 py-4 sm:py-8">
-            <!-- 여기에 기존의 모든 탭 컨텐츠가 들어갑니다 -->
-            <!-- 렉 관리, 입고, 현황, 출고, 알림, 이력, 사용자 탭들... -->
-            <!-- 길이상 생략하지만 기존 코드와 동일합니다 -->
+            <!-- 렉 관리 탭 -->
+            <div id="rack-management" class="tab-content">
+                <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6 mb-6">
+                    <h2 class="text-lg sm:text-xl font-bold mb-4 flex items-center">
+                        <span class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">📦</span>
+                        렉 추가
+                    </h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">렉 이름/번호</label>
+                            <input type="text" id="rackName" placeholder="예: A-1, 냉동창고-1, 3F-우측" 
+                                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">위치 설명</label>
+                            <input type="text" id="rackLocation" placeholder="예: 1층 좌측, 냉동구역" 
+                                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <div class="flex items-end">
+                            <button onclick="addRack()" id="addRackBtn"
+                                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors">
+                                렉 추가
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 렉 목록 -->
+                <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                    <h3 class="text-lg font-bold mb-4">등록된 렉 목록</h3>
+                    <div id="rackList" class="space-y-2"></div>
+                </div>
+            </div>
+
+            <!-- 입고 탭 -->
+            <div id="inbound" class="tab-content hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- 입고 정보 입력 -->
+                    <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                        <h2 class="text-lg sm:text-xl font-bold mb-4 flex items-center">
+                            <span class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">📥</span>
+                            입고 정보 입력
+                        </h2>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">품목명</label>
+                                <input type="text" id="itemName" placeholder="예: 삼성 갤럭시 S24" 
+                                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">품목코드</label>
+                                <input type="text" id="itemCode" placeholder="예: ITEM-001" 
+                                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">수량</label>
+                                    <input type="number" id="itemQuantity" min="1" value="1" 
+                                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">단위</label>
+                                    <select id="itemUnit" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                        <option value="개">개</option>
+                                        <option value="박스">박스</option>
+                                        <option value="팔레트">팔레트</option>
+                                        <option value="kg">kg</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                                        안전재고 (최소 수량) 
+                                        <span class="text-xs text-gray-500">⚠️ 알림 기준</span>
+                                    </label>
+                                    <input type="number" id="safetyStock" min="0" value="10" 
+                                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                                        위험재고 (임계 수량) 
+                                        <span class="text-xs text-gray-500">🚨 긴급 알림</span>
+                                    </label>
+                                    <input type="number" id="criticalStock" min="0" value="5" 
+                                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">입고일</label>
+                                <input type="date" id="inboundDate" 
+                                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                                <p class="text-sm text-yellow-800">
+                                    <strong>선택된 렉:</strong> <span id="selectedRackName">렉을 선택해주세요</span>
+                                </p>
+                            </div>
+                            <button onclick="processInbound()" id="inboundBtn"
+                                    class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-4 rounded-lg transition-colors">
+                                입고 등록
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 렉 선택 그리드 -->
+                    <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                        <h3 class="text-lg font-bold mb-4">렉 선택 (빈 렉만 표시)</h3>
+                        <div id="inboundRackGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-3"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 렉 현황 탭 -->
+            <div id="inventory" class="tab-content hidden">
+                <!-- 통계 카드 -->
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                    <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-3 sm:mr-4">
+                                <span class="text-xl sm:text-2xl">📦</span>
+                            </div>
+                            <div>
+                                <p class="text-xs sm:text-sm text-gray-600">전체 렉</p>
+                                <p class="text-lg sm:text-2xl font-bold text-blue-600" id="totalRacksCount">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 sm:w-12 sm:h-12 bg-green-100 rounded-lg flex items-center justify-center mr-3 sm:mr-4">
+                                <span class="text-xl sm:text-2xl">✅</span>
+                            </div>
+                            <div>
+                                <p class="text-xs sm:text-sm text-gray-600">사용중 렉</p>
+                                <p class="text-lg sm:text-2xl font-bold text-green-600" id="occupiedRacksCount">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded-lg flex items-center justify-center mr-3 sm:mr-4">
+                                <span class="text-xl sm:text-2xl">⭕</span>
+                            </div>
+                            <div>
+                                <p class="text-xs sm:text-sm text-gray-600">빈 렉</p>
+                                <p class="text-lg sm:text-2xl font-bold text-gray-600" id="emptyRacksCount">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 sm:w-12 sm:h-12 bg-yellow-100 rounded-lg flex items-center justify-center mr-3 sm:mr-4">
+                                <span class="text-xl sm:text-2xl">⚠️</span>
+                            </div>
+                            <div>
+                                <p class="text-xs sm:text-sm text-gray-600">안전재고 미달</p>
+                                <p class="text-lg sm:text-2xl font-bold text-yellow-600" id="warningStockCount">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 sm:w-12 sm:h-12 bg-red-100 rounded-lg flex items-center justify-center mr-3 sm:mr-4">
+                                <span class="text-xl sm:text-2xl">🚨</span>
+                            </div>
+                            <div>
+                                <p class="text-xs sm:text-sm text-gray-600">위험재고 미달</p>
+                                <p class="text-lg sm:text-2xl font-bold text-red-600" id="criticalStockCount">0</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 렉 현황 그리드 -->
+                <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                    <h2 class="text-lg sm:text-xl font-bold mb-4">렉 현황</h2>
+                    <div id="inventoryRackGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
+                </div>
+            </div>
+
+            <!-- 출고 탭 -->
+            <div id="outbound" class="tab-content hidden">
+                <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                    <h2 class="text-lg sm:text-xl font-bold mb-4 flex items-center">
+                        <span class="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center mr-3">📤</span>
+                        출고 처리
+                    </h2>
+                    <div id="outboundItemList" class="space-y-4"></div>
+                </div>
+            </div>
+
+            <!-- 재고 알림 탭 -->
+            <div id="alerts" class="tab-content hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- 알림 설정 -->
+                    <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                        <h2 class="text-lg sm:text-xl font-bold mb-4 flex items-center">
+                            <span class="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center mr-3">⚙️</span>
+                            알림 설정
+                        </h2>
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                <div>
+                                    <h4 class="font-medium text-gray-900">실시간 알림</h4>
+                                    <p class="text-sm text-gray-600">재고 부족 시 즉시 알림</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="realTimeAlerts" class="sr-only peer" checked>
+                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                </label>
+                            </div>
+                            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                <div>
+                                    <h4 class="font-medium text-gray-900">소리 알림</h4>
+                                    <p class="text-sm text-gray-600">알림 발생 시 소리 재생</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="soundAlerts" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                </label>
+                            </div>
+                            <div class="p-4 bg-blue-50 rounded-lg">
+                                <h4 class="font-medium text-blue-900 mb-2">알림 기준 안내</h4>
+                                <div class="text-sm text-blue-800 space-y-1">
+                                    <p>⚠️ <strong>안전재고 미달:</strong> 현재 수량이 안전재고보다 적을 때</p>
+                                    <p>🚨 <strong>위험재고 미달:</strong> 현재 수량이 위험재고보다 적을 때</p>
+                                </div>
+                            </div>
+                            <button onclick="testAlert()" 
+                                    class="w-full bg-orange-600 hover:bg-orange-700 text-white font-medium py-2 px-4 rounded-lg transition-colors">
+                                🔔 알림 테스트
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 현재 알림 목록 -->
+                    <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                        <h3 class="text-lg font-bold mb-4 flex items-center justify-between">
+                            <span>현재 알림 목록</span>
+                            <button onclick="clearAllAlerts()" 
+                                    class="text-sm bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded-lg transition-colors">
+                                모두 지우기
+                            </button>
+                        </h3>
+                        <div id="currentAlerts" class="space-y-3"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 이력 탭 -->
+            <div id="history" class="tab-content hidden">
+                <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                    <h2 class="text-lg sm:text-xl font-bold mb-4 flex items-center">
+                        <span class="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center mr-3">📋</span>
+                        입출고 이력
+                    </h2>
+                    <div class="mb-4 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
+                        <button onclick="exportHistory()" 
+                                class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors">
+                            📊 엑셀 내보내기
+                        </button>
+                        <button onclick="clearHistory()" id="clearHistoryBtn"
+                                class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors">
+                            🗑️ 이력 초기화
+                        </button>
+                    </div>
+                    <div id="historyList" class="space-y-3"></div>
+                </div>
+            </div>
+
+            <!-- 사용자 관리 탭 -->
+            <div id="users" class="tab-content hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- 사용자 추가 -->
+                    <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                        <h2 class="text-lg sm:text-xl font-bold mb-4 flex items-center">
+                            <span class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">👤</span>
+                            사용자 추가
+                        </h2>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">사용자 ID</label>
+                                <input type="text" id="newUserId" placeholder="사용자 ID를 입력하세요" 
+                                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">사용자 이름</label>
+                                <input type="text" id="newUserName" placeholder="사용자 이름을 입력하세요" 
+                                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">비밀번호</label>
+                                <input type="password" id="newUserPassword" placeholder="비밀번호를 입력하세요" 
+                                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">권한</label>
+                                <select id="newUserRole" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                    <option value="viewer">조회자 (읽기 전용)</option>
+                                    <option value="editor">편집자 (읽기/쓰기)</option>
+                                    <option value="admin">관리자 (모든 권한)</option>
+                                </select>
+                            </div>
+                            <button onclick="addUser()" id="addUserBtn"
+                                    class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors">
+                                사용자 추가
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 사용자 목록 -->
+                    <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                        <h3 class="text-lg font-bold mb-4">사용자 목록</h3>
+                        <div id="userList" class="space-y-3"></div>
+                    </div>
+                </div>
+
+                <!-- 권한 설명 -->
+                <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6 mt-6">
+                    <h3 class="text-lg font-bold mb-4">권한 설명</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="p-4 bg-blue-50 rounded-lg">
+                            <h4 class="font-medium text-blue-900 mb-2">👁️ 조회자 (Viewer)</h4>
+                            <ul class="text-sm text-blue-800 space-y-1">
+                                <li>• 모든 데이터 조회 가능</li>
+                                <li>• 통계 및 현황 확인</li>
+                                <li>• 이력 조회</li>
+                                <li>• 알림 확인</li>
+                                <li>• 데이터 수정/삭제 불가</li>
+                            </ul>
+                        </div>
+                        <div class="p-4 bg-green-50 rounded-lg">
+                            <h4 class="font-medium text-green-900 mb-2">✏️ 편집자 (Editor)</h4>
+                            <ul class="text-sm text-green-800 space-y-1">
+                                <li>• 조회자 권한 포함</li>
+                                <li>• 렉 추가/삭제</li>
+                                <li>• 입고/출고 처리</li>
+                                <li>• 재고 관리</li>
+                                <li>• 알림 설정</li>
+                                <li>• 사용자 관리 불가</li>
+                            </ul>
+                        </div>
+                        <div class="p-4 bg-red-50 rounded-lg">
+                            <h4 class="font-medium text-red-900 mb-2">👑 관리자 (Admin)</h4>
+                            <ul class="text-sm text-red-800 space-y-1">
+                                <li>• 편집자 권한 포함</li>
+                                <li>• 사용자 추가/삭제</li>
+                                <li>• 권한 변경</li>
+                                <li>• 시스템 설정</li>
+                                <li>• 데이터 초기화</li>
+                                <li>• 모든 기능 접근</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
 
     <script>
-        // 🆓 Supabase 설정 - 여기를 본인의 Supabase 정보로 변경하세요!
-        const SUPABASE_URL = 'https://jkjqgmvpvoqojgrvohjs.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpranFnbXZwdm9xb2pncnZvaGpzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzMDQzNDIsImV4cCI6MjA5MTg4MDM0Mn0.ZVe5AN7rArqeXL4y0Xw7Td8a3vy6Jol9sgvRl0sGAfE';
-        
-        // Supabase 클라이언트 초기화
-        let supabase;
-        let isSupabaseConnected = false;
-        
-        try {
-            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            isSupabaseConnected = true;
-            console.log('🆓 Supabase 연결 성공!');
-        } catch (error) {
-            console.error('❌ Supabase 연결 실패:', error);
-            console.log('📝 SUPABASE_URL과 SUPABASE_ANON_KEY를 확인해주세요.');
-            isSupabaseConnected = false;
-        }
-
         // 전역 변수
-        let racks = [];
-        let inventory = [];
-        let history = [];
-        let alerts = [];
-        let users = [
+        let racks = JSON.parse(localStorage.getItem('wms_racks')) || [];
+        let inventory = JSON.parse(localStorage.getItem('wms_inventory')) || [];
+        let history = JSON.parse(localStorage.getItem('wms_history')) || [];
+        let alerts = JSON.parse(localStorage.getItem('wms_alerts')) || [];
+        let users = JSON.parse(localStorage.getItem('wms_users')) || [
             { id: 'admin', name: '관리자', password: 'admin123', role: 'admin' },
             { id: 'editor', name: '편집자', password: 'edit123', role: 'editor' },
             { id: 'viewer', name: '조회자', password: 'view123', role: 'viewer' }
         ];
-        let alertSettings = {
+        let alertSettings = JSON.parse(localStorage.getItem('wms_alert_settings')) || {
             realTimeAlerts: true,
             soundAlerts: false
         };
-        let currentUser = null;
+        let currentUser = JSON.parse(localStorage.getItem('wms_current_user')) || null;
         let selectedRack = null;
 
         // 권한 정의
@@ -342,112 +654,8 @@
             }
         };
 
-        // 🆓 Supabase 실시간 데이터 저장
-        async function saveDataToSupabase() {
-            if (!isSupabaseConnected || !supabase) {
-                console.log('Supabase 연결되지 않음 - 로컬 저장소 사용');
-                saveDataToLocal();
-                return;
-            }
-
-            updateSyncStatus('syncing');
-            
-            try {
-                const data = {
-                    id: 1,
-                    racks: racks,
-                    inventory: inventory,
-                    history: history,
-                    alerts: alerts,
-                    users: users,
-                    alert_settings: alertSettings,
-                    last_updated: new Date().toISOString(),
-                    updated_by: currentUser ? currentUser.name : 'Unknown'
-                };
-
-                const { error } = await supabase
-                    .from('wms_data')
-                    .upsert(data);
-
-                if (error) {
-                    console.error('❌ Supabase 저장 실패:', error);
-                    updateSyncStatus('error');
-                    saveDataToLocal();
-                } else {
-                    console.log('✅ Supabase 저장 성공');
-                    updateSyncStatus('synced');
-                }
-            } catch (error) {
-                console.error('❌ Supabase 저장 오류:', error);
-                updateSyncStatus('error');
-                saveDataToLocal();
-            }
-        }
-
-        // 🆓 Supabase 실시간 데이터 로드
-        async function loadDataFromSupabase() {
-            if (!isSupabaseConnected || !supabase) {
-                console.log('Supabase 연결되지 않음 - 로컬 저장소 사용');
-                loadDataFromLocal();
-                return;
-            }
-
-            try {
-                const { data, error } = await supabase
-                    .from('wms_data')
-                    .select('*')
-                    .eq('id', 1)
-                    .single();
-
-                if (error) {
-                    console.error('❌ Supabase 로드 실패:', error);
-                    updateConnectionStatus(false);
-                    loadDataFromLocal();
-                    return;
-                }
-
-                if (data) {
-                    racks = data.racks || [];
-                    inventory = data.inventory || [];
-                    history = data.history || [];
-                    alerts = data.alerts || [];
-                    users = data.users || users;
-                    alertSettings = data.alert_settings || alertSettings;
-                    
-                    console.log('🆓 Supabase 데이터 로드 완료');
-                    updateDisplay();
-                    updateConnectionStatus(true);
-                    
-                    // 다른 사용자의 변경사항 알림
-                    if (data.updated_by && currentUser && data.updated_by !== currentUser.name) {
-                        showRealtimeNotification(`${data.updated_by}님이 데이터를 업데이트했습니다.`);
-                    }
-                }
-            } catch (error) {
-                console.error('❌ Supabase 로드 오류:', error);
-                updateConnectionStatus(false);
-                loadDataFromLocal();
-            }
-        }
-
-        // 실시간 구독 설정
-        function setupRealtimeSubscription() {
-            if (!isSupabaseConnected || !supabase) return;
-
-            supabase
-                .channel('wms_changes')
-                .on('postgres_changes', 
-                    { event: '*', schema: 'public', table: 'wms_data' },
-                    (payload) => {
-                        console.log('🔄 실시간 변경 감지:', payload);
-                        loadDataFromSupabase();
-                    }
-                )
-                .subscribe();
-        }
-
-        // 로컬 저장소 백업
-        function saveDataToLocal() {
+        // 데이터 저장
+        function saveData() {
             localStorage.setItem('wms_racks', JSON.stringify(racks));
             localStorage.setItem('wms_inventory', JSON.stringify(inventory));
             localStorage.setItem('wms_history', JSON.stringify(history));
@@ -456,66 +664,12 @@
             localStorage.setItem('wms_alert_settings', JSON.stringify(alertSettings));
         }
 
-        // 로컬 저장소 로드
-        function loadDataFromLocal() {
-            racks = JSON.parse(localStorage.getItem('wms_racks')) || [];
-            inventory = JSON.parse(localStorage.getItem('wms_inventory')) || [];
-            history = JSON.parse(localStorage.getItem('wms_history')) || [];
-            alerts = JSON.parse(localStorage.getItem('wms_alerts')) || [];
-            users = JSON.parse(localStorage.getItem('wms_users')) || users;
-            alertSettings = JSON.parse(localStorage.getItem('wms_alert_settings')) || alertSettings;
-            
-            updateDisplay();
-        }
-
-        // 연결 상태 업데이트
-        function updateConnectionStatus(isOnline) {
-            const statusElement = document.getElementById('connectionStatus');
-            if (statusElement) {
-                if (isOnline && isSupabaseConnected) {
-                    statusElement.className = 'connection-status online';
-                    statusElement.innerHTML = '<span class="sync-indicator synced"></span>Supabase 연결됨';
-                } else {
-                    statusElement.className = 'connection-status offline';
-                    statusElement.innerHTML = '<span class="sync-indicator"></span>오프라인 모드';
-                }
-            }
-        }
-
-        // 동기화 상태 업데이트
-        function updateSyncStatus(status) {
-            const syncElement = document.getElementById('syncStatus');
-            if (syncElement) {
-                syncElement.className = `sync-indicator ${status}`;
-            }
-        }
-
-        // 실시간 알림 표시
-        function showRealtimeNotification(message) {
-            const notification = document.createElement('div');
-            notification.className = 'alert-notification bg-green-500 text-white p-3 rounded-lg shadow-lg max-w-sm';
-            notification.innerHTML = `
-                <div class="flex items-center space-x-2">
-                    <span>🔄</span>
-                    <span class="text-sm">${message}</span>
-                    <button onclick="this.parentElement.parentElement.remove()" class="text-white hover:text-gray-200 ml-auto">×</button>
-                </div>
-            `;
-            
-            document.getElementById('alertContainer').appendChild(notification);
-            
-            setTimeout(() => {
-                if (notification.parentNode) {
-                    notification.remove();
-                }
-            }, 3000);
-        }
-
         // 초기화
         document.addEventListener('DOMContentLoaded', function() {
-            // 현재 사용자 확인
-            currentUser = JSON.parse(localStorage.getItem('wms_current_user')) || null;
+            // 사용자 데이터 저장
+            localStorage.setItem('wms_users', JSON.stringify(users));
             
+            // 로그인 상태 확인
             if (currentUser) {
                 showMainApp();
             } else {
@@ -530,12 +684,403 @@
             });
         });
 
-        // 나머지 모든 함수들은 기존과 동일하되, 
-        // saveDataToFirebase() 대신 saveDataToSupabase() 사용
-        // 모든 기존 기능들 (로그인, 렉관리, 입고, 출고, 알림 등) 포함
+        // 로그인 화면 표시
+        function showLoginScreen() {
+            document.getElementById('loginScreen').classList.remove('hidden');
+            document.getElementById('mainApp').classList.add('hidden');
+        }
 
-        // ... (기존의 모든 함수들을 여기에 포함)
-        // 길이상 생략하지만 모든 기능이 포함됩니다.
-    </script>
-</body>
-</html>
+        // 메인 앱 표시
+        function showMainApp() {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('mainApp').classList.remove('hidden');
+            
+            // 오늘 날짜 설정
+            const today = new Date().toISOString().split('T')[0];
+            const inboundDateInput = document.getElementById('inboundDate');
+            if (inboundDateInput) {
+                inboundDateInput.value = today;
+            }
+            
+            // 시간 업데이트
+            updateTime();
+            setInterval(updateTime, 1000);
+            
+            // 사용자 정보 표시
+            updateUserInfo();
+            
+            // 알림 설정 로드
+            loadAlertSettings();
+            
+            // 첫 번째 탭 활성화
+            showTab('rack-management');
+            
+            // 데이터 로드
+            updateDisplay();
+            
+            // 권한에 따른 UI 업데이트
+            updateUIByPermission();
+            
+            // 주기적 알림 체크 (30초마다)
+            setInterval(checkStockAlerts, 30000);
+            
+            // 초기 알림 체크
+            checkStockAlerts();
+        }
+
+        // 로그인
+        function login() {
+            const userId = document.getElementById('loginUserId').value.trim();
+            const password = document.getElementById('loginPassword').value.trim();
+            
+            if (!userId || !password) {
+                alert('사용자 ID와 비밀번호를 입력해주세요.');
+                return;
+            }
+            
+            const user = users.find(u => u.id === userId && u.password === password);
+            
+            if (user) {
+                currentUser = { id: user.id, name: user.name, role: user.role };
+                localStorage.setItem('wms_current_user', JSON.stringify(currentUser));
+                
+                // 입력 필드 초기화
+                document.getElementById('loginUserId').value = '';
+                document.getElementById('loginPassword').value = '';
+                
+                showMainApp();
+            } else {
+                alert('잘못된 사용자 ID 또는 비밀번호입니다.');
+            }
+        }
+
+        // 로그아웃
+        function logout() {
+            if (confirm('로그아웃 하시겠습니까?')) {
+                currentUser = null;
+                localStorage.removeItem('wms_current_user');
+                showLoginScreen();
+            }
+        }
+
+        // 사용자 정보 업데이트
+        function updateUserInfo() {
+            if (currentUser) {
+                document.getElementById('currentUser').textContent = currentUser.name;
+                
+                const roleText = {
+                    admin: '👑 관리자',
+                    editor: '✏️ 편집자', 
+                    viewer: '👁️ 조회자'
+                };
+                
+                const roleColor = {
+                    admin: 'text-red-600',
+                    editor: 'text-green-600',
+                    viewer: 'text-blue-600'
+                };
+                
+                const roleElement = document.getElementById('userRole');
+                roleElement.textContent = roleText[currentUser.role];
+                roleElement.className = `text-xs ${roleColor[currentUser.role]}`;
+            }
+        }
+
+        // 권한 확인
+        function hasPermission(action) {
+            if (!currentUser) return false;
+            return permissions[currentUser.role][action];
+        }
+
+        // 권한에 따른 UI 업데이트
+        function updateUIByPermission() {
+            const canEdit = hasPermission('canEdit');
+            const canDelete = hasPermission('canDelete');
+            const canManageUsers = hasPermission('canManageUsers');
+            
+            // 편집 불가능한 요소들 비활성화
+            const editElements = [
+                'addRackBtn', 'inboundBtn', 'addUserBtn', 'clearHistoryBtn'
+            ];
+            
+            editElements.forEach(id => {
+                const element = document.getElementById(id);
+                if (element) {
+                    if (!canEdit && id !== 'addUserBtn') {
+                        element.disabled = true;
+                        element.classList.add('opacity-50', 'cursor-not-allowed');
+                        element.onclick = () => alert('편집 권한이 없습니다.');
+                    } else if (!canManageUsers && id === 'addUserBtn') {
+                        element.disabled = true;
+                        element.classList.add('opacity-50', 'cursor-not-allowed');
+                        element.onclick = () => alert('사용자 관리 권한이 없습니다.');
+                    }
+                }
+            });
+            
+            // 사용자 관리 탭 숨기기
+            if (!canManageUsers) {
+                document.getElementById('tab-users').style.display = 'none';
+            }
+            
+            // 입력 필드 비활성화
+            if (!canEdit) {
+                const inputs = document.querySelectorAll('input[type="text"], input[type="number"], input[type="date"], select');
+                inputs.forEach(input => {
+                    if (!input.id.includes('login') && !input.id.includes('alert')) {
+                        input.disabled = true;
+                        input.classList.add('opacity-50');
+                    }
+                });
+            }
+        }
+
+        // 시간 업데이트
+        function updateTime() {
+            const now = new Date();
+            const timeElement = document.getElementById('currentTime');
+            if (timeElement) {
+                timeElement.textContent = now.toLocaleString('ko-KR');
+            }
+        }
+
+        // 알림 설정 로드
+        function loadAlertSettings() {
+            const realTimeAlertsEl = document.getElementById('realTimeAlerts');
+            const soundAlertsEl = document.getElementById('soundAlerts');
+            
+            if (realTimeAlertsEl) realTimeAlertsEl.checked = alertSettings.realTimeAlerts;
+            if (soundAlertsEl) soundAlertsEl.checked = alertSettings.soundAlerts;
+            
+            // 이벤트 리스너 추가
+            if (realTimeAlertsEl) realTimeAlertsEl.addEventListener('change', saveAlertSettings);
+            if (soundAlertsEl) soundAlertsEl.addEventListener('change', saveAlertSettings);
+        }
+
+        // 알림 설정 저장
+        function saveAlertSettings() {
+            alertSettings = {
+                realTimeAlerts: document.getElementById('realTimeAlerts').checked,
+                soundAlerts: document.getElementById('soundAlerts').checked
+            };
+            saveData();
+        }
+
+        // 재고 알림 체크
+        function checkStockAlerts() {
+            if (!alertSettings.realTimeAlerts) return;
+            
+            const newAlerts = [];
+            const currentTime = new Date().toISOString();
+            
+            inventory.forEach(item => {
+                const warningLevel = getStockWarningLevel(item);
+                
+                if (warningLevel !== 'normal') {
+                    // 기존 알림이 있는지 확인
+                    const existingAlert = alerts.find(alert => 
+                        alert.itemId === item.id && alert.level === warningLevel
+                    );
+                    
+                    if (!existingAlert) {
+                        const alert = {
+                            id: Date.now().toString() + Math.random(),
+                            itemId: item.id,
+                            itemName: item.itemName,
+                            itemCode: item.itemCode,
+                            rackName: item.rackName,
+                            currentQuantity: item.quantity,
+                            unit: item.unit,
+                            level: warningLevel,
+                            safetyStock: item.safetyStock,
+                            criticalStock: item.criticalStock,
+                            timestamp: currentTime,
+                            acknowledged: false
+                        };
+                        
+                        newAlerts.push(alert);
+                        alerts.push(alert);
+                    }
+                }
+            });
+            
+            // 새로운 알림이 있으면 표시
+            if (newAlerts.length > 0) {
+                newAlerts.forEach(alert => showAlert(alert));
+                saveData();
+                updateAlertDisplay();
+            }
+            
+            // 해결된 알림 제거
+            alerts = alerts.filter(alert => {
+                const item = inventory.find(i => i.id === alert.itemId);
+                if (!item) return false; // 품목이 삭제된 경우
+                
+                const currentLevel = getStockWarningLevel(item);
+                return currentLevel === alert.level; // 레벨이 같으면 유지
+            });
+            
+            saveData();
+            updateAlertDisplay();
+        }
+
+        // 재고 경고 레벨 확인
+        function getStockWarningLevel(item) {
+            if (!item.criticalStock && !item.safetyStock) return 'normal';
+            
+            if (item.criticalStock && item.quantity <= item.criticalStock) {
+                return 'critical';
+            } else if (item.safetyStock && item.quantity <= item.safetyStock) {
+                return 'warning';
+            }
+            return 'normal';
+        }
+
+        // 알림 표시
+        function showAlert(alert) {
+            const container = document.getElementById('alertContainer');
+            const alertElement = document.createElement('div');
+            
+            const isCritical = alert.level === 'critical';
+            const bgColor = isCritical ? 'bg-red-500' : 'bg-yellow-500';
+            const icon = isCritical ? '🚨' : '⚠️';
+            const title = isCritical ? '위험재고 미달' : '안전재고 미달';
+            
+            alertElement.className = `alert-notification ${bgColor} text-white p-4 rounded-lg shadow-lg max-w-sm`;
+            alertElement.innerHTML = `
+                <div class="flex items-start justify-between">
+                    <div class="flex items-start space-x-3">
+                        <span class="text-2xl">${icon}</span>
+                        <div>
+                            <h4 class="font-bold">${title}</h4>
+                            <p class="text-sm">${alert.itemName} (${alert.itemCode})</p>
+                            <p class="text-sm">렉: ${alert.rackName}</p>
+                            <p class="text-sm">현재: ${alert.currentQuantity}${alert.unit}</p>
+                            <p class="text-xs opacity-90">
+                                ${isCritical ? `위험재고: ${alert.criticalStock}${alert.unit}` : `안전재고: ${alert.safetyStock}${alert.unit}`}
+                            </p>
+                        </div>
+                    </div>
+                    <button onclick="this.parentElement.parentElement.remove()" 
+                            class="text-white hover:text-gray-200 text-xl">×</button>
+                </div>
+            `;
+            
+            container.appendChild(alertElement);
+            
+            // 소리 알림
+            if (alertSettings.soundAlerts) {
+                playAlertSound(isCritical);
+            }
+            
+            // 5초 후 자동 제거
+            setTimeout(() => {
+                if (alertElement.parentNode) {
+                    alertElement.remove();
+                }
+            }, 5000);
+        }
+
+        // 알림 소리 재생
+        function playAlertSound(isCritical) {
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.frequency.value = isCritical ? 800 : 600;
+                oscillator.type = 'sine';
+                
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.5);
+            } catch (error) {
+                console.log('Audio context not available');
+            }
+        }
+
+        // 알림 테스트
+        function testAlert() {
+            const testAlert = {
+                id: 'test',
+                itemName: '테스트 품목',
+                itemCode: 'TEST-001',
+                rackName: 'A-1',
+                currentQuantity: 3,
+                unit: '개',
+                level: 'critical',
+                criticalStock: 5,
+                timestamp: new Date().toISOString()
+            };
+            
+            showAlert(testAlert);
+        }
+
+        // 알림 디스플레이 업데이트
+        function updateAlertDisplay() {
+            const activeAlerts = alerts.filter(alert => !alert.acknowledged);
+            const alertCount = activeAlerts.length;
+            
+            // 배지 업데이트
+            const alertBadge = document.getElementById('alertBadge');
+            const alertTabBadge = document.getElementById('alertTabBadge');
+            
+            if (alertCount > 0) {
+                if (alertBadge) {
+                    alertBadge.textContent = alertCount;
+                    alertBadge.classList.remove('hidden');
+                }
+                if (alertTabBadge) {
+                    alertTabBadge.textContent = alertCount;
+                    alertTabBadge.classList.remove('hidden');
+                }
+            } else {
+                if (alertBadge) alertBadge.classList.add('hidden');
+                if (alertTabBadge) alertTabBadge.classList.add('hidden');
+            }
+            
+            // 현재 알림 목록 업데이트
+            updateCurrentAlerts();
+        }
+
+        // 현재 알림 목록 업데이트
+        function updateCurrentAlerts() {
+            const container = document.getElementById('currentAlerts');
+            if (!container) return;
+            
+            const activeAlerts = alerts.filter(alert => !alert.acknowledged);
+            
+            if (activeAlerts.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-500 py-8">현재 알림이 없습니다.</p>';
+                return;
+            }
+            
+            container.innerHTML = activeAlerts.map(alert => {
+                const isCritical = alert.level === 'critical';
+                const bgColor = isCritical ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200';
+                const icon = isCritical ? '🚨' : '⚠️';
+                const title = isCritical ? '위험재고 미달' : '안전재고 미달';
+                
+                return `
+                    <div class="border ${bgColor} rounded-lg p-4">
+                        <div class="flex items-start justify-between">
+                            <div class="flex items-start space-x-3">
+                                <span class="text-2xl">${icon}</span>
+                                <div>
+                                    <h4 class="font-medium text-gray-900">${title}</h4>
+                                    <p class="text-sm text-gray-700">${alert.itemName} (${alert.itemCode})</p>
+                                    <p class="text-sm text-gray-600">렉: ${alert.rackName}</p>
+                                    <p class="text-sm text-gray-600">현재: ${alert.currentQuantity}${alert.unit}</p>
+                                    <p class="text-xs text-gray-500">
+                                        발생시간: ${new Date(alert.timestamp).toLocaleString('ko-KR')}
+                                    </p>
+                                </div>
+                            </div>
+                            <button onclick="acknowledgeAlert('${alert.id}')" 
+                                    class="bg-gray-500 hover:bg-gray-600 text-white text-sm px-3 py-1 rounded-lg transition-colors">
+                                확
