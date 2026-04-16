@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CJ대한통운 WMS 시스템 v4.0 - 완전 무료 실시간</title>
+    <title>CJ대한통운 WMS 시스템 v4.0 - 진짜 실시간 공유</title>
     <script src="https://cdn.tailwindcss.com"></script>
     
     <style>
@@ -115,8 +115,8 @@
 </head>
 <body class="bg-gray-50 min-h-screen">
     <!-- 연결 상태 표시 -->
-    <div id="connectionStatus" class="connection-status online">
-        ✅ 실시간 동기화 활성
+    <div id="connectionStatus" class="connection-status syncing">
+        🔄 서버 연결 중...
     </div>
 
     <!-- 로그인 화면 -->
@@ -128,7 +128,7 @@
                 </div>
                 <h1 class="text-2xl font-bold text-gray-800">CJ대한통운</h1>
                 <p class="text-gray-600">창고관리시스템 v4.0</p>
-                <p class="text-sm text-gray-500 mt-2">🌐 완전 무료 실시간 공유</p>
+                <p class="text-sm text-gray-500 mt-2">🌐 진짜 실시간 공유</p>
             </div>
             
             <div class="space-y-4">
@@ -159,10 +159,17 @@
 
             <div class="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                 <p class="text-xs text-green-800">
-                    🌐 <strong>완전 무료 실시간:</strong><br>
-                    • JSONBin 무료 서버 사용<br>
-                    • 모든 기기 실시간 동기화<br>
-                    • 새로고침해도 데이터 유지
+                    🌐 <strong>진짜 실시간 공유:</strong><br>
+                    • 모든 기기에서 같은 데이터<br>
+                    • 실시간 자동 동기화<br>
+                    • 데이터 영구 저장
+                </p>
+            </div>
+
+            <div class="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p class="text-xs text-blue-800">
+                    🔧 <strong>서버 상태:</strong><br>
+                    <span id="serverStatus">연결 확인 중...</span>
                 </p>
             </div>
         </div>
@@ -183,7 +190,7 @@
                         </div>
                         <div>
                             <h1 class="text-lg sm:text-2xl font-bold text-gray-800">CJ대한통운 WMS v4.0</h1>
-                            <p class="text-sm text-gray-600 hidden sm:block">🌐 실시간 공유 시스템</p>
+                            <p class="text-sm text-gray-600 hidden sm:block">🌐 진짜 실시간 공유</p>
                         </div>
                     </div>
                     <div class="flex items-center space-x-4">
@@ -199,7 +206,7 @@
                                 <div class="text-sm font-medium text-gray-800" id="currentUser"></div>
                                 <div class="text-xs" id="userRole"></div>
                             </div>
-                            <button onclick="manualSync()" class="bg-green-500 hover:bg-green-600 text-white px-2 sm:px-3 py-2 rounded-lg transition-colors text-sm">
+                            <button onclick="forceSync()" class="bg-green-500 hover:bg-green-600 text-white px-2 sm:px-3 py-2 rounded-lg transition-colors text-sm">
                                 🔄 새로고침
                             </button>
                             <button onclick="logout()" class="bg-gray-500 hover:bg-gray-600 text-white px-2 sm:px-3 py-2 rounded-lg transition-colors text-sm">
@@ -268,7 +275,7 @@
 
                 <!-- 렉 목록 -->
                 <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
-                    <h3 class="text-lg font-bold mb-4">등록된 렉 목록 <span class="text-sm text-green-600">(실시간 공유)</span></h3>
+                    <h3 class="text-lg font-bold mb-4">등록된 렉 목록 <span class="text-sm text-green-600">(서버 공유 데이터)</span></h3>
                     <div id="rackList" class="space-y-2"></div>
                 </div>
             </div>
@@ -474,12 +481,13 @@
     </div>
 
     <script>
-        // 🌐 JSONBin.io 무료 실시간 동기화 시스템
-        const API_KEY = '$2a$10$1g2VkH2eV1BlloK0LEElouPx6uQYDMLaFCQISW.tAGO0iKkRaxsoq'; // JSONBin.io에서 발급받은 API Key
-        const BIN_ID = '69e0c0b210716a4d5de5bff3'; // 생성된 Bin ID
+        // 🌐 JSONBin.io 진짜 실시간 동기화 시스템
+        // ⚠️ 여기에 실제 API Key와 Bin ID를 입력하세요!
+        const API_KEY = '$2a$10$1g2VkH2eV1BlloK0LEElouPx6uQYDMLaFCQISW.tAGO0iKkRaxsoq'; // JSONBin.io에서 발급받은 실제 API Key
+        const BIN_ID = '69e0c0b210716a4d5de5bff3'; // JSONBin.io에서 생성한 실제 Bin ID
         const API_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
         
-        const SYNC_INTERVAL = 5000; // 5초마다 동기화
+        const SYNC_INTERVAL = 3000; // 3초마다 동기화
         
         // 전역 변수
         let racks = [];
@@ -494,6 +502,7 @@
         let selectedRack = null;
         let lastDataHash = '';
         let syncInterval;
+        let isInitialized = false;
 
         // 권한 정의
         const permissions = {
@@ -502,10 +511,59 @@
             admin: { canView: true, canEdit: true, canDelete: true, canManageUsers: true }
         };
 
+        // 🌐 서버 연결 테스트
+        async function testServerConnection() {
+            console.log('🔧 서버 연결 테스트 시작...');
+            updateServerStatus('연결 테스트 중...');
+            
+            try {
+                const response = await fetch(API_URL + '/latest', {
+                    method: 'GET',
+                    headers: {
+                        'X-Master-Key': API_KEY
+                    }
+                });
+                
+                if (response.ok) {
+                    console.log('✅ 서버 연결 성공!');
+                    updateServerStatus('✅ 서버 연결 성공!');
+                    updateConnectionStatus('online');
+                    return true;
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+            } catch (error) {
+                console.error('❌ 서버 연결 실패:', error);
+                updateServerStatus(`❌ 연결 실패: ${error.message}`);
+                updateConnectionStatus('offline');
+                return false;
+            }
+        }
+
+        // 서버 상태 업데이트
+        function updateServerStatus(message) {
+            const statusElement = document.getElementById('serverStatus');
+            if (statusElement) {
+                statusElement.textContent = message;
+            }
+        }
+
         // 🌐 실시간 동기화 시스템
         async function startRealTimeSync() {
             console.log('🌐 실시간 동기화 시작');
+            
+            // 서버 연결 테스트
+            const isConnected = await testServerConnection();
+            if (!isConnected) {
+                console.error('❌ 서버 연결 실패로 동기화 중단');
+                return;
+            }
+            
+            // 초기 데이터 로드
             await loadFromServer();
+            
+            // 주기적 동기화 시작
             syncInterval = setInterval(loadFromServer, SYNC_INTERVAL);
         }
 
@@ -533,27 +591,88 @@
                     const serverData = data.record;
                     const newDataHash = generateDataHash(serverData);
                     
-                    if (newDataHash !== lastDataHash) {
+                    if (newDataHash !== lastDataHash || !isInitialized) {
+                        console.log('📥 서버에서 새 데이터 로드:', serverData);
+                        
                         racks = serverData.racks || [];
                         inventory = serverData.inventory || [];
                         history = serverData.history || [];
                         users = serverData.users || users;
                         
                         lastDataHash = newDataHash;
+                        isInitialized = true;
+                        
                         updateDisplay();
                         updateLastSyncTime();
                         
-                        console.log('📥 서버에서 데이터 업데이트됨');
+                        console.log(`📊 데이터 로드 완료: 렉 ${racks.length}개, 재고 ${inventory.length}개`);
                     }
                     
                     updateConnectionStatus('online');
                 } else {
-                    throw new Error('서버 응답 오류');
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
                 
             } catch (error) {
                 console.error('❌ 서버 로드 실패:', error);
                 updateConnectionStatus('offline');
+                
+                // 첫 로드 실패 시 기본 데이터로 초기화
+                if (!isInitialized) {
+                    console.log('🔧 기본 데이터로 초기화');
+                    await initializeWithDefaultData();
+                }
+            }
+        }
+
+        // 기본 데이터로 초기화
+        async function initializeWithDefaultData() {
+            const defaultData = {
+                racks: [],
+                inventory: [],
+                history: [],
+                users: [
+                    { id: 'admin', name: '관리자', password: 'admin123', role: 'admin' },
+                    { id: 'editor', name: '편집자', password: 'edit123', role: 'editor' },
+                    { id: 'viewer', name: '조회자', password: 'view123', role: 'viewer' }
+                ],
+                lastUpdated: new Date().toISOString(),
+                version: 1
+            };
+            
+            console.log('🔧 서버에 기본 데이터 생성 시도...');
+            
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': API_KEY
+                    },
+                    body: JSON.stringify(defaultData)
+                });
+                
+                if (response.ok) {
+                    console.log('✅ 기본 데이터 생성 완료');
+                    racks = defaultData.racks;
+                    inventory = defaultData.inventory;
+                    history = defaultData.history;
+                    users = defaultData.users;
+                    isInitialized = true;
+                    updateDisplay();
+                } else {
+                    throw new Error('기본 데이터 생성 실패');
+                }
+                
+            } catch (error) {
+                console.error('❌ 기본 데이터 생성 실패:', error);
+                // 로컬에서라도 기본값 사용
+                racks = defaultData.racks;
+                inventory = defaultData.inventory;
+                history = defaultData.history;
+                users = defaultData.users;
+                isInitialized = true;
+                updateDisplay();
             }
         }
 
@@ -587,7 +706,7 @@
                     updateConnectionStatus('online');
                     showSyncNotification('✅ 모든 기기에 동기화됨!');
                 } else {
-                    throw new Error('서버 저장 오류');
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
                 
             } catch (error) {
@@ -597,8 +716,8 @@
             }
         }
 
-        // 수동 동기화
-        async function manualSync() {
+        // 강제 동기화
+        async function forceSync() {
             showSyncNotification('🔄 수동 동기화 중...');
             await loadFromServer();
         }
@@ -635,13 +754,13 @@
             if (statusElement) {
                 if (status === 'online') {
                     statusElement.className = 'connection-status online';
-                    statusElement.textContent = '✅ 실시간 동기화 활성';
+                    statusElement.textContent = '✅ 서버 연결됨';
                 } else if (status === 'syncing') {
                     statusElement.className = 'connection-status syncing';
                     statusElement.textContent = '🔄 동기화 중...';
                 } else {
                     statusElement.className = 'connection-status offline';
-                    statusElement.textContent = '❌ 동기화 오류';
+                    statusElement.textContent = '❌ 서버 연결 실패';
                 }
             }
         }
@@ -657,6 +776,17 @@
 
         // 초기화
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 WMS 시스템 시작');
+            
+            // API 설정 확인
+            if (API_KEY === '$2a$10$YOUR_ACTUAL_API_KEY_HERE' || BIN_ID === 'YOUR_ACTUAL_BIN_ID_HERE') {
+                console.error('❌ API Key 또는 Bin ID가 설정되지 않았습니다!');
+                updateServerStatus('❌ API 설정 필요');
+                updateConnectionStatus('offline');
+            } else {
+                console.log('✅ API 설정 확인됨');
+            }
+            
             currentUser = JSON.parse(localStorage.getItem('wms_current_user')) || null;
             
             if (currentUser) {
@@ -664,6 +794,8 @@
                 startRealTimeSync();
             } else {
                 showLoginScreen();
+                // 로그인 화면에서도 서버 연결 테스트
+                testServerConnection();
             }
             
             document.getElementById('loginPassword').addEventListener('keypress', function(e) {
@@ -888,6 +1020,8 @@
             
             document.getElementById('rackName').value = '';
             document.getElementById('rackLocation').value = '';
+            
+            showSyncNotification(`📦 렉 "${name}" 추가됨!`);
         }
 
         // 렉 삭제
@@ -908,6 +1042,7 @@
                 racks = racks.filter(rack => rack.id !== rackId);
                 await saveToServer();
                 updateDisplay();
+                showSyncNotification(`🗑️ 렉 "${rack.name}" 삭제됨!`);
             }
         }
 
@@ -1055,6 +1190,7 @@
             document.getElementById('selectedRackName').textContent = '렉을 선택해주세요';
             
             updateInboundRackGrid();
+            showSyncNotification(`📥 입고 완료: ${itemName}`);
         }
 
         // 재고 현황 업데이트
@@ -1221,6 +1357,7 @@
             await saveToServer();
             updateDisplay();
             updateOutboundDisplay();
+            showSyncNotification(`📤 출고 완료: ${item.itemName} ${outboundQuantity}${item.unit}`);
         }
 
         // 사용자 추가
@@ -1255,6 +1392,7 @@
             document.getElementById('newUserRole').value = 'viewer';
             
             updateUserList();
+            showSyncNotification(`👤 사용자 "${userName}" 추가됨!`);
         }
 
         // 사용자 삭제
@@ -1274,6 +1412,7 @@
                 users = users.filter(u => u.id !== userId);
                 await saveToServer();
                 updateUserList();
+                showSyncNotification(`🗑️ 사용자 "${user.name}" 삭제됨!`);
             }
         }
 
@@ -1296,6 +1435,8 @@
                     updateUserInfo();
                     updateUIByPermission();
                 }
+                
+                showSyncNotification(`👑 "${user.name}" 권한 변경됨!`);
             }
         }
 
@@ -1445,6 +1586,7 @@
                 history = [];
                 await saveToServer();
                 updateHistoryDisplay();
+                showSyncNotification('🗑️ 모든 이력이 삭제되었습니다!');
             }
         }
     </script>
