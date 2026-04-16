@@ -83,18 +83,6 @@
             background: #f59e0b;
             color: white;
         }
-        .debug-panel {
-            position: fixed;
-            bottom: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.8);
-            color: white;
-            padding: 1rem;
-            border-radius: 0.5rem;
-            font-size: 0.75rem;
-            max-width: 300px;
-            z-index: 1000;
-        }
         
         /* 반응형 스타일 */
         @media (max-width: 768px) {
@@ -132,12 +120,6 @@
                 display: inline-block;
                 white-space: nowrap;
             }
-            .debug-panel {
-                bottom: 5px;
-                right: 5px;
-                left: 5px;
-                max-width: none;
-            }
         }
         @media (max-width: 640px) {
             .grid-cols-2 {
@@ -156,21 +138,7 @@
 <body class="bg-gray-50 min-h-screen">
     <!-- 연결 상태 표시 -->
     <div id="connectionStatus" class="connection-status online">
-        🔄 완전 동기화 모드
-    </div>
-
-    <!-- 디버그 패널 -->
-    <div id="debugPanel" class="debug-panel">
-        <div class="font-bold mb-2">🔍 동기화 상태</div>
-        <div id="debugInfo">
-            <div>마지막 동기화: <span id="lastSync">-</span></div>
-            <div>렉 개수: <span id="dataCount">0</span></div>
-            <div>재고 개수: <span id="inventoryCount">0</span></div>
-            <div>현재 기기: <span id="deviceInfo">-</span></div>
-        </div>
-        <button onclick="toggleDebug()" class="mt-2 bg-blue-600 text-white px-2 py-1 rounded text-xs">
-            숨기기
-        </button>
+        ✅ 완전 동기화 활성
     </div>
 
     <!-- 로그인 화면 -->
@@ -245,7 +213,6 @@
                             <div class="text-sm text-gray-500" id="currentTime"></div>
                             <div class="text-lg font-semibold text-blue-600">
                                 총 렉: <span id="totalRacks">0</span>개
-                                <span id="lastSyncTime" class="text-xs text-gray-400 ml-2"></span>
                             </div>
                         </div>
                         <div class="flex items-center space-x-2">
@@ -617,10 +584,9 @@
     </div>
 
     <script>
-        // 🔧 완전 기능 + 강제 동기화 시스템
+        // 🔧 완전 기능 + 동기화 시스템
         const SYNC_INTERVAL = 3000; // 3초마다 동기화
-        const STORAGE_KEY = 'wms_complete_system_v4';
-        const DEVICE_ID = 'device_' + Math.random().toString(36).substr(2, 9);
+        const STORAGE_KEY = 'wms_complete_system_v5';
         
         // 전역 변수
         let racks = [];
@@ -640,7 +606,6 @@
         let selectedRack = null;
         let lastDataHash = '';
         let syncInterval;
-        let debugMode = true;
 
         // 권한 정의
         const permissions = {
@@ -649,38 +614,14 @@
             admin: { canView: true, canEdit: true, canDelete: true, canManageUsers: true }
         };
 
-        // 🔧 디버그 정보 업데이트
-        function updateDebugInfo() {
-            if (!debugMode) return;
-            
-            const deviceInfo = /Mobile|Android|iPhone|iPad/.test(navigator.userAgent) ? '📱 모바일' : '💻 데스크톱';
-            
-            document.getElementById('lastSync').textContent = new Date().toLocaleTimeString('ko-KR');
-            document.getElementById('dataCount').textContent = racks.length;
-            document.getElementById('inventoryCount').textContent = inventory.length;
-            document.getElementById('deviceInfo').textContent = deviceInfo;
-        }
-
-        // 디버그 패널 토글
-        function toggleDebug() {
-            const panel = document.getElementById('debugPanel');
-            if (panel.style.display === 'none') {
-                panel.style.display = 'block';
-                debugMode = true;
-            } else {
-                panel.style.display = 'none';
-                debugMode = false;
-            }
-        }
-
-        // 🔄 강제 동기화 시스템
-        function startForceSync() {
-            console.log('🔧 완전 동기화 시작');
+        // 🔄 동기화 시스템
+        function startSync() {
+            console.log('🔧 동기화 시작');
             forceSync();
             syncInterval = setInterval(forceSync, SYNC_INTERVAL);
         }
 
-        function stopForceSync() {
+        function stopSync() {
             if (syncInterval) {
                 clearInterval(syncInterval);
                 console.log('🔧 동기화 중지');
@@ -699,9 +640,6 @@
                     const newDataHash = generateDataHash(data);
                     
                     if (newDataHash !== lastDataHash) {
-                        const oldRackCount = racks.length;
-                        const oldInventoryCount = inventory.length;
-                        
                         racks = data.racks || [];
                         inventory = data.inventory || [];
                         history = data.history || [];
@@ -711,12 +649,6 @@
                         
                         lastDataHash = newDataHash;
                         updateDisplay();
-                        updateDebugInfo();
-                        
-                        // 변경사항 알림
-                        if (racks.length !== oldRackCount || inventory.length !== oldInventoryCount) {
-                            showSyncNotification(`📦 데이터 업데이트: 렉 ${racks.length}개, 재고 ${inventory.length}개`);
-                        }
                         
                         console.log(`🔄 동기화 완료 - 렉 ${racks.length}개, 재고 ${inventory.length}개`);
                     }
@@ -735,8 +667,8 @@
             return btoa(JSON.stringify(data)).slice(0, 20);
         }
 
-        // 강제 데이터 저장
-        function forceSaveData() {
+        // 데이터 저장
+        function saveData() {
             const data = {
                 racks: racks,
                 inventory: inventory,
@@ -746,14 +678,12 @@
                 alertSettings: alertSettings,
                 lastUpdated: new Date().toISOString(),
                 updatedBy: currentUser ? currentUser.name : 'System',
-                deviceId: DEVICE_ID,
-                version: 4
+                version: 5
             };
             
             try {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
                 lastDataHash = generateDataHash(data);
-                updateDebugInfo();
                 console.log('💾 데이터 저장 완료');
                 updateConnectionStatus('online');
                 
@@ -819,12 +749,11 @@
 
         // 초기화
         document.addEventListener('DOMContentLoaded', function() {
-            updateDebugInfo();
             currentUser = JSON.parse(localStorage.getItem('wms_current_user')) || null;
             
             if (currentUser) {
                 showMainApp();
-                startForceSync();
+                startSync();
             } else {
                 showLoginScreen();
             }
@@ -835,7 +764,7 @@
                 }
             });
 
-            window.addEventListener('beforeunload', stopForceSync);
+            window.addEventListener('beforeunload', stopSync);
             window.addEventListener('focus', forceSync);
         });
 
@@ -843,7 +772,7 @@
         function showLoginScreen() {
             document.getElementById('loginScreen').classList.remove('hidden');
             document.getElementById('mainApp').classList.add('hidden');
-            stopForceSync();
+            stopSync();
         }
 
         // 메인 앱 표시
@@ -867,7 +796,7 @@
             updateUIByPermission();
             
             if (!syncInterval) {
-                startForceSync();
+                startSync();
             }
             
             // 주기적 알림 체크
@@ -906,7 +835,7 @@
             if (confirm('로그아웃 하시겠습니까?')) {
                 currentUser = null;
                 localStorage.removeItem('wms_current_user');
-                stopForceSync();
+                stopSync();
                 showLoginScreen();
             }
         }
@@ -1007,7 +936,7 @@
                 realTimeAlerts: document.getElementById('realTimeAlerts').checked,
                 soundAlerts: document.getElementById('soundAlerts').checked
             };
-            forceSaveData();
+            saveData();
         }
 
         // 재고 알림 체크
@@ -1049,7 +978,7 @@
             
             if (newAlerts.length > 0) {
                 newAlerts.forEach(alert => showAlert(alert));
-                forceSaveData();
+                saveData();
                 updateAlertDisplay();
             }
             
@@ -1061,7 +990,7 @@
                 return currentLevel === alert.level;
             });
             
-            forceSaveData();
+            saveData();
             updateAlertDisplay();
         }
 
@@ -1233,7 +1162,7 @@
             const alert = alerts.find(a => a.id === alertId);
             if (alert) {
                 alert.acknowledged = true;
-                forceSaveData();
+                saveData();
                 updateAlertDisplay();
             }
         }
@@ -1242,7 +1171,7 @@
         function clearAllAlerts() {
             if (confirm('모든 알림을 지우시겠습니까?')) {
                 alerts = [];
-                forceSaveData();
+                saveData();
                 updateAlertDisplay();
             }
         }
@@ -1329,7 +1258,7 @@
             };
             
             racks.push(newRack);
-            forceSaveData();
+            saveData();
             updateDisplay();
             
             document.getElementById('rackName').value = '';
@@ -1354,7 +1283,7 @@
             const rack = racks.find(r => r.id === rackId);
             if (confirm(`정말로 "${rack.name}" 렉을 삭제하시겠습니까?`)) {
                 racks = racks.filter(rack => rack.id !== rackId);
-                forceSaveData();
+                saveData();
                 updateDisplay();
                 showSyncNotification(`🗑️ 렉 "${rack.name}" 삭제됨!`);
             }
@@ -1511,7 +1440,7 @@
             
             history.unshift(historyItem);
             
-            forceSaveData();
+            saveData();
             updateDisplay();
             
             setTimeout(checkStockAlerts, 100);
@@ -1743,7 +1672,7 @@
                 item.quantity -= outboundQuantity;
             }
             
-            forceSaveData();
+            saveData();
             updateDisplay();
             updateOutboundDisplay();
             
@@ -1776,7 +1705,7 @@
             
             const newUser = { id: userId, name: userName, password: password, role: role };
             users.push(newUser);
-            forceSaveData();
+            saveData();
             
             document.getElementById('newUserId').value = '';
             document.getElementById('newUserName').value = '';
@@ -1802,7 +1731,7 @@
             const user = users.find(u => u.id === userId);
             if (confirm(`정말로 "${user.name}" 사용자를 삭제하시겠습니까?`)) {
                 users = users.filter(u => u.id !== userId);
-                forceSaveData();
+                saveData();
                 updateUserList();
                 showSyncNotification(`🗑️ 사용자 "${user.name}" 삭제됨!`);
             }
@@ -1818,7 +1747,7 @@
             const user = users.find(u => u.id === userId);
             if (user) {
                 user.role = newRole;
-                forceSaveData();
+                saveData();
                 updateUserList();
                 
                 if (userId === currentUser.id) {
@@ -1934,7 +1863,6 @@
             updateHistoryDisplay();
             updateAlertDisplay();
             updateUserList();
-            updateDebugInfo();
         }
 
         // 이력 내보내기 (CSV)
@@ -1978,7 +1906,7 @@
             
             if (confirm('모든 이력을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
                 history = [];
-                forceSaveData();
+                saveData();
                 updateHistoryDisplay();
                 showSyncNotification('🗑️ 모든 이력이 삭제되었습니다!');
             }
