@@ -1083,4 +1083,784 @@
                             </div>
                             <button onclick="acknowledgeAlert('${alert.id}')" 
                                     class="bg-gray-500 hover:bg-gray-600 text-white text-sm px-3 py-1 rounded-lg transition-colors">
-                                확
+                                확인
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 알림 확인 처리
+        function acknowledgeAlert(alertId) {
+            const alert = alerts.find(a => a.id === alertId);
+            if (alert) {
+                alert.acknowledged = true;
+                saveData();
+                updateAlertDisplay();
+            }
+        }
+
+        // 모든 알림 지우기
+        function clearAllAlerts() {
+            if (confirm('모든 알림을 지우시겠습니까?')) {
+                alerts = [];
+                saveData();
+                updateAlertDisplay();
+            }
+        }
+
+        // 알림 요약 표시
+        function showAlertSummary() {
+            const activeAlerts = alerts.filter(alert => !alert.acknowledged);
+            if (activeAlerts.length === 0) {
+                alert('현재 활성화된 알림이 없습니다.');
+                return;
+            }
+            
+            const criticalCount = activeAlerts.filter(a => a.level === 'critical').length;
+            const warningCount = activeAlerts.filter(a => a.level === 'warning').length;
+            
+            let message = `현재 알림 현황:\n`;
+            if (criticalCount > 0) message += `🚨 위험재고 미달: ${criticalCount}건\n`;
+            if (warningCount > 0) message += `⚠️ 안전재고 미달: ${warningCount}건\n`;
+            message += `\n자세한 내용은 '재고 알림' 탭에서 확인하세요.`;
+            
+            alert(message);
+        }
+
+        // 탭 전환
+        function showTab(tabName) {
+            // 권한 체크
+            if (tabName === 'users' && !hasPermission('canManageUsers')) {
+                alert('사용자 관리 권한이 없습니다.');
+                return;
+            }
+            
+            // 모든 탭 컨텐츠 숨기기
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.add('hidden');
+            });
+            
+            // 모든 탭 버튼 비활성화
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('tab-active');
+                btn.classList.add('bg-gray-100', 'text-gray-700', 'hover:bg-gray-200');
+            });
+            
+            // 선택된 탭 활성화
+            const tabContent = document.getElementById(tabName);
+            const tabButton = document.getElementById('tab-' + tabName);
+            
+            if (tabContent) tabContent.classList.remove('hidden');
+            if (tabButton) {
+                tabButton.classList.add('tab-active');
+                tabButton.classList.remove('bg-gray-100', 'text-gray-700', 'hover:bg-gray-200');
+            }
+            
+            // 탭별 데이터 업데이트
+            if (tabName === 'inventory') updateInventoryDisplay();
+            if (tabName === 'outbound') updateOutboundDisplay();
+            if (tabName === 'history') updateHistoryDisplay();
+            if (tabName === 'inbound') updateInboundRackGrid();
+            if (tabName === 'rack-management') updateRackList();
+            if (tabName === 'alerts') updateCurrentAlerts();
+            if (tabName === 'users') updateUserList();
+        }
+
+        // 렉 추가
+        function addRack() {
+            if (!hasPermission('canEdit')) {
+                alert('편집 권한이 없습니다.');
+                return;
+            }
+            
+            const name = document.getElementById('rackName').value.trim();
+            const location = document.getElementById('rackLocation').value.trim();
+            
+            if (!name) {
+                alert('렉 이름을 입력해주세요.');
+                return;
+            }
+            
+            // 중복 확인
+            if (racks.find(rack => rack.name === name)) {
+                alert('이미 존재하는 렉 이름입니다.');
+                return;
+            }
+            
+            const newRack = {
+                id: Date.now().toString(),
+                name: name,
+                location: location,
+                createdAt: new Date().toISOString(),
+                createdBy: currentUser.id
+            };
+            
+            racks.push(newRack);
+            saveData();
+            updateDisplay();
+            
+            // 입력 필드 초기화
+            document.getElementById('rackName').value = '';
+            document.getElementById('rackLocation').value = '';
+            
+            alert('렉이 추가되었습니다.');
+        }
+
+        // 렉 삭제
+        function deleteRack(rackId) {
+            if (!hasPermission('canDelete')) {
+                alert('삭제 권한이 없습니다.');
+                return;
+            }
+            
+            // 해당 렉에 재고가 있는지 확인
+            const hasInventory = inventory.some(item => item.rackId === rackId);
+            if (hasInventory) {
+                alert('재고가 있는 렉은 삭제할 수 없습니다.');
+                return;
+            }
+            
+            if (confirm('정말로 이 렉을 삭제하시겠습니까?')) {
+                racks = racks.filter(rack => rack.id !== rackId);
+                saveData();
+                updateDisplay();
+            }
+        }
+
+        // 렉 목록 업데이트
+        function updateRackList() {
+            const rackList = document.getElementById('rackList');
+            if (!rackList) return;
+            
+            if (racks.length === 0) {
+                rackList.innerHTML = '<p class="text-gray-500 text-center py-8">등록된 렉이 없습니다.</p>';
+                return;
+            }
+            
+            rackList.innerHTML = racks.map(rack => {
+                const rackInventory = inventory.filter(item => item.rackId === rack.id);
+                const hasInventory = rackInventory.length > 0;
+                
+                let statusBadge = '<span class="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded-full">빈 렉</span>';
+                
+                if (hasInventory) {
+                    const hasWarning = rackInventory.some(item => getStockWarningLevel(item) === 'warning');
+                    const hasCritical = rackInventory.some(item => getStockWarningLevel(item) === 'critical');
+                    
+                    if (hasCritical) {
+                        statusBadge = '<span class="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">🚨 위험재고</span>';
+                    } else if (hasWarning) {
+                        statusBadge = '<span class="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full">⚠️ 안전재고 미달</span>';
+                    } else {
+                        statusBadge = '<span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">사용중</span>';
+                    }
+                }
+                
+                return `
+                    <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
+                        <div class="flex-1">
+                            <div class="flex items-center space-x-3">
+                                <h4 class="font-medium text-gray-900">${rack.name}</h4>
+                                ${statusBadge}
+                            </div>
+                            <p class="text-sm text-gray-500">${rack.location || '위치 정보 없음'}</p>
+                            <p class="text-xs text-gray-400">생성일: ${new Date(rack.createdAt).toLocaleDateString('ko-KR')}</p>
+                        </div>
+                        ${hasPermission('canDelete') ? `
+                            <button onclick="deleteRack('${rack.id}')" 
+                                    class="text-red-600 hover:text-red-800 p-2 rounded-lg hover:bg-red-50 transition-colors">
+                                🗑️
+                            </button>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 입고용 렉 그리드 업데이트
+        function updateInboundRackGrid() {
+            const grid = document.getElementById('inboundRackGrid');
+            if (!grid) return;
+            
+            const emptyRacks = racks.filter(rack => 
+                !inventory.some(item => item.rackId === rack.id)
+            );
+            
+            if (emptyRacks.length === 0) {
+                grid.innerHTML = '<p class="col-span-full text-center text-gray-500 py-8">사용 가능한 빈 렉이 없습니다.</p>';
+                return;
+            }
+            
+            grid.innerHTML = emptyRacks.map(rack => `
+                <div class="rack-item rack-empty p-4 rounded-lg text-center ${hasPermission('canEdit') ? '' : 'opacity-50 cursor-not-allowed'}" 
+                     onclick="${hasPermission('canEdit') ? `selectRack('${rack.id}', '${rack.name}')` : `alert('편집 권한이 없습니다.')`}">
+                    <div class="font-medium text-gray-700">${rack.name}</div>
+                    <div class="text-xs text-gray-500 mt-1">${rack.location || ''}</div>
+                    <div class="text-xs text-green-600 mt-2">✅ 사용가능</div>
+                </div>
+            `).join('');
+        }
+
+        // 렉 선택
+        function selectRack(rackId, rackName) {
+            if (!hasPermission('canEdit')) {
+                alert('편집 권한이 없습니다.');
+                return;
+            }
+            
+            // 기존 선택 해제
+            document.querySelectorAll('.rack-selected').forEach(el => {
+                el.classList.remove('rack-selected');
+                el.classList.add('rack-empty');
+            });
+            
+            // 새로운 렉 선택
+            event.target.classList.remove('rack-empty');
+            event.target.classList.add('rack-selected');
+            
+            selectedRack = { id: rackId, name: rackName };
+            document.getElementById('selectedRackName').textContent = rackName;
+        }
+
+        // 입고 처리
+        function processInbound() {
+            if (!hasPermission('canEdit')) {
+                alert('편집 권한이 없습니다.');
+                return;
+            }
+            
+            const itemName = document.getElementById('itemName').value.trim();
+            const itemCode = document.getElementById('itemCode').value.trim();
+            const quantity = parseInt(document.getElementById('itemQuantity').value);
+            const unit = document.getElementById('itemUnit').value;
+            const safetyStock = parseInt(document.getElementById('safetyStock').value) || 0;
+            const criticalStock = parseInt(document.getElementById('criticalStock').value) || 0;
+            const inboundDate = document.getElementById('inboundDate').value;
+            
+            if (!itemName || !itemCode || !quantity || !selectedRack) {
+                alert('모든 필드를 입력하고 렉을 선택해주세요.');
+                return;
+            }
+            
+            if (criticalStock > safetyStock && safetyStock > 0) {
+                alert('위험재고는 안전재고보다 작아야 합니다.');
+                return;
+            }
+            
+            // 재고 추가
+            const inventoryItem = {
+                id: Date.now().toString(),
+                itemName,
+                itemCode,
+                quantity,
+                unit,
+                safetyStock,
+                criticalStock,
+                rackId: selectedRack.id,
+                rackName: selectedRack.name,
+                inboundDate,
+                createdAt: new Date().toISOString(),
+                createdBy: currentUser.id
+            };
+            
+            inventory.push(inventoryItem);
+            
+            // 이력 추가
+            const historyItem = {
+                id: Date.now().toString(),
+                type: 'inbound',
+                itemName,
+                itemCode,
+                quantity,
+                unit,
+                rackName: selectedRack.name,
+                date: inboundDate,
+                timestamp: new Date().toISOString(),
+                userId: currentUser.id,
+                userName: currentUser.name
+            };
+            
+            history.unshift(historyItem);
+            
+            saveData();
+            updateDisplay();
+            
+            // 입고 후 즉시 알림 체크
+            setTimeout(checkStockAlerts, 100);
+            
+            // 입력 필드 초기화
+            document.getElementById('itemName').value = '';
+            document.getElementById('itemCode').value = '';
+            document.getElementById('itemQuantity').value = '1';
+            document.getElementById('safetyStock').value = '10';
+            document.getElementById('criticalStock').value = '5';
+            document.getElementById('inboundDate').value = new Date().toISOString().split('T')[0];
+            selectedRack = null;
+            document.getElementById('selectedRackName').textContent = '렉을 선택해주세요';
+            
+            // 렉 그리드 업데이트
+            updateInboundRackGrid();
+            
+            alert('입고가 완료되었습니다.');
+        }
+
+        // 재고 현황 업데이트
+        function updateInventoryDisplay() {
+            updateStats();
+            updateInventoryGrid();
+        }
+
+        // 통계 업데이트
+        function updateStats() {
+            const totalRacks = racks.length;
+            const occupiedRacks = new Set(inventory.map(item => item.rackId)).size;
+            const emptyRacks = totalRacks - occupiedRacks;
+            
+            let warningCount = 0;
+            let criticalCount = 0;
+            
+            inventory.forEach(item => {
+                const level = getStockWarningLevel(item);
+                if (level === 'warning') warningCount++;
+                if (level === 'critical') criticalCount++;
+            });
+            
+            const elements = {
+                totalRacksCount: totalRacks,
+                occupiedRacksCount: occupiedRacks,
+                emptyRacksCount: emptyRacks,
+                warningStockCount: warningCount,
+                criticalStockCount: criticalCount,
+                totalRacks: totalRacks
+            };
+            
+            Object.entries(elements).forEach(([id, value]) => {
+                const element = document.getElementById(id);
+                if (element) element.textContent = value;
+            });
+        }
+
+        // 재고 그리드 업데이트
+        function updateInventoryGrid() {
+            const grid = document.getElementById('inventoryRackGrid');
+            if (!grid) return;
+            
+            if (racks.length === 0) {
+                grid.innerHTML = '<p class="col-span-full text-center text-gray-500 py-8">등록된 렉이 없습니다.</p>';
+                return;
+            }
+            
+            grid.innerHTML = racks.map(rack => {
+                const rackInventory = inventory.filter(item => item.rackId === rack.id);
+                const isEmpty = rackInventory.length === 0;
+                
+                let rackClass = 'rack-empty';
+                let statusIcon = '';
+                
+                if (!isEmpty) {
+                    const hasWarning = rackInventory.some(item => getStockWarningLevel(item) === 'warning');
+                    const hasCritical = rackInventory.some(item => getStockWarningLevel(item) === 'critical');
+                    
+                    if (hasCritical) {
+                        rackClass = 'rack-critical';
+                        statusIcon = '🚨';
+                    } else if (hasWarning) {
+                        rackClass = 'rack-warning';
+                        statusIcon = '⚠️';
+                    } else {
+                        rackClass = 'rack-occupied';
+                        statusIcon = '✅';
+                    }
+                }
+                
+                return `
+                    <div class="rack-item ${rackClass} p-4 rounded-lg">
+                        <div class="font-medium text-gray-800 mb-2 flex items-center justify-between">
+                            <span class="text-sm">${rack.name}</span>
+                            ${statusIcon && `<span class="text-lg">${statusIcon}</span>`}
+                        </div>
+                        <div class="text-xs text-gray-600 mb-2">${rack.location || ''}</div>
+                        ${isEmpty ? 
+                            '<div class="text-xs text-gray-500">빈 렉</div>' : 
+                            `<div class="space-y-1">
+                                ${rackInventory.map(item => {
+                                    const level = getStockWarningLevel(item);
+                                    let textColor = 'text-gray-600';
+                                    if (level === 'critical') textColor = 'text-red-600';
+                                    else if (level === 'warning') textColor = 'text-yellow-600';
+                                    
+                                    return `
+                                        <div class="text-xs bg-white bg-opacity-50 p-2 rounded">
+                                            <div class="font-medium truncate">${item.itemName}</div>
+                                            <div class="${textColor} font-medium">${item.quantity}${item.unit}</div>
+                                            ${item.safetyStock ? `<div class="text-gray-500">안전: ${item.safetyStock}${item.unit}</div>` : ''}
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>`
+                        }
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 출고 화면 업데이트
+        function updateOutboundDisplay() {
+            const container = document.getElementById('outboundItemList');
+            if (!container) return;
+            
+            if (inventory.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-500 py-8">출고할 재고가 없습니다.</p>';
+                return;
+            }
+            
+            container.innerHTML = inventory.map(item => {
+                const warningLevel = getStockWarningLevel(item);
+                let alertBadge = '';
+                
+                if (warningLevel === 'critical') {
+                    alertBadge = '<span class="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">🚨 위험재고</span>';
+                } else if (warningLevel === 'warning') {
+                    alertBadge = '<span class="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full">⚠️ 안전재고 미달</span>';
+                }
+                
+                return `
+                    <div class="border border-gray-200 rounded-lg p-4">
+                        <div class="flex items-center justify-between flex-col sm:flex-row space-y-4 sm:space-y-0">
+                            <div class="flex-1 w-full">
+                                <div class="flex items-center space-x-3 mb-2 flex-wrap">
+                                    <h4 class="font-medium text-gray-900">${item.itemName}</h4>
+                                    ${alertBadge}
+                                </div>
+                                <p class="text-sm text-gray-600">코드: ${item.itemCode} | 렉: ${item.rackName}</p>
+                                <p class="text-sm text-gray-500">입고일: ${item.inboundDate}</p>
+                                ${item.safetyStock ? `<p class="text-xs text-gray-500">안전재고: ${item.safetyStock}${item.unit}</p>` : ''}
+                                ${item.criticalStock ? `<p class="text-xs text-gray-500">위험재고: ${item.criticalStock}${item.unit}</p>` : ''}
+                            </div>
+                            <div class="flex items-center space-x-4 flex-col sm:flex-row space-y-2 sm:space-y-0">
+                                <div class="text-center">
+                                    <p class="text-sm text-gray-600">현재 수량</p>
+                                    <p class="text-lg font-bold text-blue-600">${item.quantity}${item.unit}</p>
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-600 mb-1">출고 수량</label>
+                                    <input type="number" min="1" max="${item.quantity}" value="${item.quantity}" 
+                                           id="outbound-${item.id}" 
+                                           class="w-20 px-2 py-1 border border-gray-300 rounded text-center"
+                                           ${!hasPermission('canEdit') ? 'disabled' : ''}>
+                                </div>
+                                <button onclick="processOutbound('${item.id}')" 
+                                        class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors ${!hasPermission('canEdit') ? 'opacity-50 cursor-not-allowed' : ''}"
+                                        ${!hasPermission('canEdit') ? 'disabled' : ''}>
+                                    출고
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 출고 처리
+        function processOutbound(itemId) {
+            if (!hasPermission('canEdit')) {
+                alert('편집 권한이 없습니다.');
+                return;
+            }
+            
+            const item = inventory.find(i => i.id === itemId);
+            const outboundQuantity = parseInt(document.getElementById(`outbound-${itemId}`).value);
+            
+            if (!outboundQuantity || outboundQuantity <= 0) {
+                alert('출고 수량을 입력해주세요.');
+                return;
+            }
+            
+            if (outboundQuantity > item.quantity) {
+                alert('재고 수량보다 많이 출고할 수 없습니다.');
+                return;
+            }
+            
+            // 출고 후 재고 상태 체크
+            const remainingQuantity = item.quantity - outboundQuantity;
+            let warningMessage = '';
+            
+            if (item.criticalStock && remainingQuantity <= item.criticalStock) {
+                warningMessage = `\n⚠️ 출고 후 위험재고(${item.criticalStock}${item.unit}) 이하가 됩니다!`;
+            } else if (item.safetyStock && remainingQuantity <= item.safetyStock) {
+                warningMessage = `\n⚠️ 출고 후 안전재고(${item.safetyStock}${item.unit}) 이하가 됩니다!`;
+            }
+            
+            if (!confirm(`${item.itemName} ${outboundQuantity}${item.unit}를 출고하시겠습니까?${warningMessage}`)) {
+                return;
+            }
+            
+            // 이력 추가
+            const historyItem = {
+                id: Date.now().toString(),
+                type: 'outbound',
+                itemName: item.itemName,
+                itemCode: item.itemCode,
+                quantity: outboundQuantity,
+                unit: item.unit,
+                rackName: item.rackName,
+                date: new Date().toISOString().split('T')[0],
+                timestamp: new Date().toISOString(),
+                userId: currentUser.id,
+                userName: currentUser.name
+            };
+            
+            history.unshift(historyItem);
+            
+            // 재고 수량 조정
+            if (outboundQuantity === item.quantity) {
+                // 전체 출고 - 재고에서 제거
+                inventory = inventory.filter(i => i.id !== itemId);
+                // 관련 알림도 제거
+                alerts = alerts.filter(alert => alert.itemId !== itemId);
+            } else {
+                // 부분 출고 - 수량만 차감
+                item.quantity -= outboundQuantity;
+            }
+            
+            saveData();
+            updateDisplay();
+            updateOutboundDisplay();
+            
+            // 출고 후 즉시 알림 체크
+            setTimeout(checkStockAlerts, 100);
+            
+            alert('출고가 완료되었습니다.');
+        }
+
+        // 사용자 추가
+        function addUser() {
+            if (!hasPermission('canManageUsers')) {
+                alert('사용자 관리 권한이 없습니다.');
+                return;
+            }
+            
+            const userId = document.getElementById('newUserId').value.trim();
+            const userName = document.getElementById('newUserName').value.trim();
+            const password = document.getElementById('newUserPassword').value.trim();
+            const role = document.getElementById('newUserRole').value;
+            
+            if (!userId || !userName || !password) {
+                alert('모든 필드를 입력해주세요.');
+                return;
+            }
+            
+            if (users.find(u => u.id === userId)) {
+                alert('이미 존재하는 사용자 ID입니다.');
+                return;
+            }
+            
+            const newUser = { id: userId, name: userName, password: password, role: role };
+            users.push(newUser);
+            saveData();
+            
+            // 입력 필드 초기화
+            document.getElementById('newUserId').value = '';
+            document.getElementById('newUserName').value = '';
+            document.getElementById('newUserPassword').value = '';
+            document.getElementById('newUserRole').value = 'viewer';
+            
+            updateUserList();
+            alert('사용자가 추가되었습니다.');
+        }
+
+        // 사용자 삭제
+        function deleteUser(userId) {
+            if (!hasPermission('canManageUsers')) {
+                alert('사용자 관리 권한이 없습니다.');
+                return;
+            }
+            
+            if (userId === currentUser.id) {
+                alert('현재 로그인한 사용자는 삭제할 수 없습니다.');
+                return;
+            }
+            
+            if (confirm('정말로 이 사용자를 삭제하시겠습니까?')) {
+                users = users.filter(u => u.id !== userId);
+                saveData();
+                updateUserList();
+            }
+        }
+
+        // 사용자 권한 변경
+        function changeUserRole(userId, newRole) {
+            if (!hasPermission('canManageUsers')) {
+                alert('사용자 관리 권한이 없습니다.');
+                return;
+            }
+            
+            const user = users.find(u => u.id === userId);
+            if (user) {
+                user.role = newRole;
+                saveData();
+                updateUserList();
+                
+                // 현재 사용자의 권한이 변경된 경우
+                if (userId === currentUser.id) {
+                    currentUser.role = newRole;
+                    localStorage.setItem('wms_current_user', JSON.stringify(currentUser));
+                    updateUserInfo();
+                    updateUIByPermission();
+                }
+            }
+        }
+
+        // 사용자 목록 업데이트
+        function updateUserList() {
+            const container = document.getElementById('userList');
+            if (!container) return;
+            
+            if (users.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-500 py-8">등록된 사용자가 없습니다.</p>';
+                return;
+            }
+            
+            const roleText = {
+                admin: '👑 관리자',
+                editor: '✏️ 편집자',
+                viewer: '👁️ 조회자'
+            };
+            
+            const roleColor = {
+                admin: 'bg-red-100 text-red-800',
+                editor: 'bg-green-100 text-green-800',
+                viewer: 'bg-blue-100 text-blue-800'
+            };
+            
+            container.innerHTML = users.map(user => `
+                <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
+                    <div class="flex-1">
+                        <div class="flex items-center space-x-3">
+                            <h4 class="font-medium text-gray-900">${user.name}</h4>
+                            <span class="permission-badge ${roleColor[user.role]} rounded-full">${roleText[user.role]}</span>
+                            ${user.id === currentUser.id ? '<span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">현재 사용자</span>' : ''}
+                        </div>
+                        <p class="text-sm text-gray-500">ID: ${user.id}</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        ${hasPermission('canManageUsers') ? `
+                            <select onchange="changeUserRole('${user.id}', this.value)" 
+                                    class="text-sm border border-gray-300 rounded px-2 py-1"
+                                    ${user.id === currentUser.id ? 'disabled' : ''}>
+                                <option value="viewer" ${user.role === 'viewer' ? 'selected' : ''}>조회자</option>
+                                <option value="editor" ${user.role === 'editor' ? 'selected' : ''}>편집자</option>
+                                <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>관리자</option>
+                            </select>
+                            ${user.id !== currentUser.id ? `
+                                <button onclick="deleteUser('${user.id}')" 
+                                        class="text-red-600 hover:text-red-800 p-2 rounded-lg hover:bg-red-50 transition-colors">
+                                    🗑️
+                                </button>
+                            ` : ''}
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 이력 화면 업데이트
+        function updateHistoryDisplay() {
+            const container = document.getElementById('historyList');
+            if (!container) return;
+            
+            if (history.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-500 py-8">이력이 없습니다.</p>';
+                return;
+            }
+            
+            container.innerHTML = history.map(item => {
+                const isInbound = item.type === 'inbound';
+                const bgColor = isInbound ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200';
+                const icon = isInbound ? '📥' : '📤';
+                const typeText = isInbound ? '입고' : '출고';
+                
+                return `
+                    <div class="border ${bgColor} rounded-lg p-4">
+                        <div class="flex items-center justify-between flex-col sm:flex-row space-y-2 sm:space-y-0">
+                            <div class="flex items-center space-x-3 w-full sm:w-auto">
+                                <span class="text-2xl">${icon}</span>
+                                <div class="flex-1">
+                                    <h4 class="font-medium text-gray-900">${item.itemName}</h4>
+                                    <p class="text-sm text-gray-600">
+                                        ${typeText} | ${item.quantity}${item.unit} | 렉: ${item.rackName}
+                                    </p>
+                                    ${item.userName ? `<p class="text-xs text-gray-500">처리자: ${item.userName}</p>` : ''}
+                                </div>
+                            </div>
+                            <div class="text-right text-sm text-gray-500">
+                                <p>${item.date}</p>
+                                <p>${new Date(item.timestamp).toLocaleTimeString('ko-KR')}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 전체 디스플레이 업데이트
+        function updateDisplay() {
+            updateStats();
+            updateRackList();
+            updateInboundRackGrid();
+            updateInventoryDisplay();
+            updateOutboundDisplay();
+            updateHistoryDisplay();
+            updateAlertDisplay();
+            updateUserList();
+        }
+
+        // 이력 내보내기 (CSV)
+        function exportHistory() {
+            if (history.length === 0) {
+                alert('내보낼 이력이 없습니다.');
+                return;
+            }
+            
+            const headers = ['구분', '품목명', '품목코드', '수량', '단위', '렉', '날짜', '시간', '처리자'];
+            const csvContent = [
+                headers.join(','),
+                ...history.map(item => [
+                    item.type === 'inbound' ? '입고' : '출고',
+                    item.itemName,
+                    item.itemCode,
+                    item.quantity,
+                    item.unit,
+                    item.rackName,
+                    item.date,
+                    new Date(item.timestamp).toLocaleString('ko-KR'),
+                    item.userName || ''
+                ].join(','))
+            ].join('\n');
+            
+            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `WMS_이력_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+        }
+
+        // 이력 초기화
+        function clearHistory() {
+            if (!hasPermission('canDelete')) {
+                alert('삭제 권한이 없습니다.');
+                return;
+            }
+            
+            if (confirm('모든 이력을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+                history = [];
+                saveData();
+                updateHistoryDisplay();
+                alert('이력이 초기화되었습니다.');
+            }
+        }
+    </script>
+</body>
+</html>
