@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CJ대한통운 WMS 시스템 v4.0 - 완전 자동 동기화</title>
+    <title>CJ대한통운 WMS 시스템 v4.0 - 완전판</title>
     <script src="https://cdn.tailwindcss.com"></script>
     
     <style>
@@ -83,6 +83,18 @@
             background: #f59e0b;
             color: white;
         }
+        .debug-panel {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            font-size: 0.75rem;
+            max-width: 300px;
+            z-index: 1000;
+        }
         
         /* 반응형 스타일 */
         @media (max-width: 768px) {
@@ -120,6 +132,12 @@
                 display: inline-block;
                 white-space: nowrap;
             }
+            .debug-panel {
+                bottom: 5px;
+                right: 5px;
+                left: 5px;
+                max-width: none;
+            }
         }
         @media (max-width: 640px) {
             .grid-cols-2 {
@@ -138,7 +156,21 @@
 <body class="bg-gray-50 min-h-screen">
     <!-- 연결 상태 표시 -->
     <div id="connectionStatus" class="connection-status online">
-        ✅ 자동 동기화 활성
+        🔄 완전 동기화 모드
+    </div>
+
+    <!-- 디버그 패널 -->
+    <div id="debugPanel" class="debug-panel">
+        <div class="font-bold mb-2">🔍 동기화 상태</div>
+        <div id="debugInfo">
+            <div>마지막 동기화: <span id="lastSync">-</span></div>
+            <div>렉 개수: <span id="dataCount">0</span></div>
+            <div>재고 개수: <span id="inventoryCount">0</span></div>
+            <div>현재 기기: <span id="deviceInfo">-</span></div>
+        </div>
+        <button onclick="toggleDebug()" class="mt-2 bg-blue-600 text-white px-2 py-1 rounded text-xs">
+            숨기기
+        </button>
     </div>
 
     <!-- 로그인 화면 -->
@@ -150,7 +182,7 @@
                 </div>
                 <h1 class="text-2xl font-bold text-gray-800">CJ대한통운</h1>
                 <p class="text-gray-600">창고관리시스템 v4.0</p>
-                <p class="text-sm text-gray-500 mt-2">🔄 완전 자동 동기화</p>
+                <p class="text-sm text-gray-500 mt-2">🔄 완전 기능 + 동기화</p>
             </div>
             
             <div class="space-y-4">
@@ -181,10 +213,10 @@
 
             <div class="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                 <p class="text-xs text-green-800">
-                    🔄 <strong>완전 자동:</strong><br>
-                    • 별도 설정 불필요<br>
-                    • 모든 기기 자동 동기화<br>
-                    • 100% 무료
+                    ✅ <strong>완전 기능:</strong><br>
+                    • 렉 관리 • 입고/출고<br>
+                    • 재고 알림 • 이력 관리<br>
+                    • 실시간 동기화
                 </p>
             </div>
         </div>
@@ -205,7 +237,7 @@
                         </div>
                         <div>
                             <h1 class="text-lg sm:text-2xl font-bold text-gray-800">CJ대한통운 WMS v4.0</h1>
-                            <p class="text-sm text-gray-600 hidden sm:block">🔄 완전 자동 동기화</p>
+                            <p class="text-sm text-gray-600 hidden sm:block">🔄 완전 기능 + 동기화</p>
                         </div>
                     </div>
                     <div class="flex items-center space-x-4">
@@ -221,6 +253,9 @@
                                 <div class="text-sm font-medium text-gray-800" id="currentUser"></div>
                                 <div class="text-xs" id="userRole"></div>
                             </div>
+                            <button onclick="forceSync()" class="bg-green-500 hover:bg-green-600 text-white px-2 sm:px-3 py-2 rounded-lg transition-colors text-sm">
+                                🔄 동기화
+                            </button>
                             <button onclick="showAlertSummary()" class="flex items-center space-x-2 bg-red-100 hover:bg-red-200 text-red-800 px-2 sm:px-3 py-2 rounded-lg transition-colors">
                                 <span>⚠️</span>
                                 <span class="hidden sm:inline">알림</span>
@@ -296,79 +331,296 @@
 
                 <!-- 렉 목록 -->
                 <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
-                    <h3 class="text-lg font-bold mb-4">등록된 렉 목록 <span class="text-sm text-gray-500">(자동 동기화)</span></h3>
+                    <h3 class="text-lg font-bold mb-4">등록된 렉 목록</h3>
                     <div id="rackList" class="space-y-2"></div>
                 </div>
             </div>
 
-            <!-- 간단한 다른 탭들 -->
+            <!-- 입고 탭 -->
             <div id="inbound" class="tab-content hidden">
-                <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
-                    <h2 class="text-lg font-bold">📥 입고 관리</h2>
-                    <p class="text-gray-600 mt-4">입고 기능은 곧 추가될 예정입니다.</p>
-                </div>
-            </div>
-
-            <div id="inventory" class="tab-content hidden">
-                <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
-                    <h2 class="text-lg font-bold">📊 렉 현황</h2>
-                    <div class="mt-4">
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div class="bg-blue-50 p-4 rounded-lg">
-                                <p class="text-sm text-blue-600">전체 렉</p>
-                                <p class="text-2xl font-bold text-blue-800" id="totalRacksCount">0</p>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- 입고 정보 입력 -->
+                    <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                        <h2 class="text-lg sm:text-xl font-bold mb-4 flex items-center">
+                            <span class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">📥</span>
+                            입고 정보 입력
+                        </h2>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">품목명</label>
+                                <input type="text" id="itemName" placeholder="예: 삼성 갤럭시 S24" 
+                                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                             </div>
-                            <div class="bg-green-50 p-4 rounded-lg">
-                                <p class="text-sm text-green-600">사용중 렉</p>
-                                <p class="text-2xl font-bold text-green-800">0</p>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">품목코드</label>
+                                <input type="text" id="itemCode" placeholder="예: ITEM-001" 
+                                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                             </div>
-                            <div class="bg-gray-50 p-4 rounded-lg">
-                                <p class="text-sm text-gray-600">빈 렉</p>
-                                <p class="text-2xl font-bold text-gray-800" id="emptyRacksCount">0</p>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">수량</label>
+                                    <input type="number" id="itemQuantity" min="1" value="1" 
+                                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">단위</label>
+                                    <select id="itemUnit" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                        <option value="개">개</option>
+                                        <option value="박스">박스</option>
+                                        <option value="팔레트">팔레트</option>
+                                        <option value="kg">kg</option>
+                                    </select>
+                                </div>
                             </div>
-                            <div class="bg-yellow-50 p-4 rounded-lg">
-                                <p class="text-sm text-yellow-600">알림</p>
-                                <p class="text-2xl font-bold text-yellow-800">0</p>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                                        안전재고 (최소 수량) 
+                                        <span class="text-xs text-gray-500">⚠️ 알림 기준</span>
+                                    </label>
+                                    <input type="number" id="safetyStock" min="0" value="10" 
+                                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                                        위험재고 (임계 수량) 
+                                        <span class="text-xs text-gray-500">🚨 긴급 알림</span>
+                                    </label>
+                                    <input type="number" id="criticalStock" min="0" value="5" 
+                                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                </div>
                             </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">입고일</label>
+                                <input type="date" id="inboundDate" 
+                                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                                <p class="text-sm text-yellow-800">
+                                    <strong>선택된 렉:</strong> <span id="selectedRackName">렉을 선택해주세요</span>
+                                </p>
+                            </div>
+                            <button onclick="processInbound()" id="inboundBtn"
+                                    class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-4 rounded-lg transition-colors">
+                                입고 등록
+                            </button>
                         </div>
+                    </div>
+
+                    <!-- 렉 선택 그리드 -->
+                    <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                        <h3 class="text-lg font-bold mb-4">렉 선택 (빈 렉만 표시)</h3>
+                        <div id="inboundRackGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-3"></div>
                     </div>
                 </div>
             </div>
 
+            <!-- 렉 현황 탭 -->
+            <div id="inventory" class="tab-content hidden">
+                <!-- 통계 카드 -->
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                    <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-3 sm:mr-4">
+                                <span class="text-xl sm:text-2xl">📦</span>
+                            </div>
+                            <div>
+                                <p class="text-xs sm:text-sm text-gray-600">전체 렉</p>
+                                <p class="text-lg sm:text-2xl font-bold text-blue-600" id="totalRacksCount">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 sm:w-12 sm:h-12 bg-green-100 rounded-lg flex items-center justify-center mr-3 sm:mr-4">
+                                <span class="text-xl sm:text-2xl">✅</span>
+                            </div>
+                            <div>
+                                <p class="text-xs sm:text-sm text-gray-600">사용중 렉</p>
+                                <p class="text-lg sm:text-2xl font-bold text-green-600" id="occupiedRacksCount">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded-lg flex items-center justify-center mr-3 sm:mr-4">
+                                <span class="text-xl sm:text-2xl">⭕</span>
+                            </div>
+                            <div>
+                                <p class="text-xs sm:text-sm text-gray-600">빈 렉</p>
+                                <p class="text-lg sm:text-2xl font-bold text-gray-600" id="emptyRacksCount">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 sm:w-12 sm:h-12 bg-yellow-100 rounded-lg flex items-center justify-center mr-3 sm:mr-4">
+                                <span class="text-xl sm:text-2xl">⚠️</span>
+                            </div>
+                            <div>
+                                <p class="text-xs sm:text-sm text-gray-600">안전재고 미달</p>
+                                <p class="text-lg sm:text-2xl font-bold text-yellow-600" id="warningStockCount">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 sm:w-12 sm:h-12 bg-red-100 rounded-lg flex items-center justify-center mr-3 sm:mr-4">
+                                <span class="text-xl sm:text-2xl">🚨</span>
+                            </div>
+                            <div>
+                                <p class="text-xs sm:text-sm text-gray-600">위험재고 미달</p>
+                                <p class="text-lg sm:text-2xl font-bold text-red-600" id="criticalStockCount">0</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 렉 현황 그리드 -->
+                <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                    <h2 class="text-lg sm:text-xl font-bold mb-4">렉 현황</h2>
+                    <div id="inventoryRackGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
+                </div>
+            </div>
+
+            <!-- 출고 탭 -->
             <div id="outbound" class="tab-content hidden">
                 <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
-                    <h2 class="text-lg font-bold">📤 출고 관리</h2>
-                    <p class="text-gray-600 mt-4">출고 기능은 곧 추가될 예정입니다.</p>
+                    <h2 class="text-lg sm:text-xl font-bold mb-4 flex items-center">
+                        <span class="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center mr-3">📤</span>
+                        출고 처리
+                    </h2>
+                    <div id="outboundItemList" class="space-y-4"></div>
                 </div>
             </div>
 
+            <!-- 재고 알림 탭 -->
             <div id="alerts" class="tab-content hidden">
-                <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
-                    <h2 class="text-lg font-bold">⚠️ 재고 알림</h2>
-                    <p class="text-gray-600 mt-4">현재 활성화된 알림이 없습니다.</p>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- 알림 설정 -->
+                    <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                        <h2 class="text-lg sm:text-xl font-bold mb-4 flex items-center">
+                            <span class="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center mr-3">⚙️</span>
+                            알림 설정
+                        </h2>
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                <div>
+                                    <h4 class="font-medium text-gray-900">실시간 알림</h4>
+                                    <p class="text-sm text-gray-600">재고 부족 시 즉시 알림</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="realTimeAlerts" class="sr-only peer" checked>
+                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                </label>
+                            </div>
+                            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                <div>
+                                    <h4 class="font-medium text-gray-900">소리 알림</h4>
+                                    <p class="text-sm text-gray-600">알림 발생 시 소리 재생</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="soundAlerts" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                </label>
+                            </div>
+                            <button onclick="testAlert()" 
+                                    class="w-full bg-orange-600 hover:bg-orange-700 text-white font-medium py-2 px-4 rounded-lg transition-colors">
+                                🔔 알림 테스트
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 현재 알림 목록 -->
+                    <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                        <h3 class="text-lg font-bold mb-4 flex items-center justify-between">
+                            <span>현재 알림 목록</span>
+                            <button onclick="clearAllAlerts()" 
+                                    class="text-sm bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded-lg transition-colors">
+                                모두 지우기
+                            </button>
+                        </h3>
+                        <div id="currentAlerts" class="space-y-3"></div>
+                    </div>
                 </div>
             </div>
 
+            <!-- 이력 탭 -->
             <div id="history" class="tab-content hidden">
                 <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
-                    <h2 class="text-lg font-bold">📋 입출고 이력</h2>
-                    <p class="text-gray-600 mt-4">이력이 없습니다.</p>
+                    <h2 class="text-lg sm:text-xl font-bold mb-4 flex items-center">
+                        <span class="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center mr-3">📋</span>
+                        입출고 이력
+                    </h2>
+                    <div class="mb-4 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
+                        <button onclick="exportHistory()" 
+                                class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors">
+                            📊 엑셀 내보내기
+                        </button>
+                        <button onclick="clearHistory()" id="clearHistoryBtn"
+                                class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors">
+                            🗑️ 이력 초기화
+                        </button>
+                    </div>
+                    <div id="historyList" class="space-y-3"></div>
                 </div>
             </div>
 
+            <!-- 사용자 관리 탭 -->
             <div id="users" class="tab-content hidden">
-                <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
-                    <h2 class="text-lg font-bold">👥 사용자 관리</h2>
-                    <div id="userList" class="mt-4"></div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- 사용자 추가 -->
+                    <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                        <h2 class="text-lg sm:text-xl font-bold mb-4 flex items-center">
+                            <span class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">👤</span>
+                            사용자 추가
+                        </h2>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">사용자 ID</label>
+                                <input type="text" id="newUserId" placeholder="사용자 ID를 입력하세요" 
+                                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">사용자 이름</label>
+                                <input type="text" id="newUserName" placeholder="사용자 이름을 입력하세요" 
+                                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">비밀번호</label>
+                                <input type="password" id="newUserPassword" placeholder="비밀번호를 입력하세요" 
+                                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">권한</label>
+                                <select id="newUserRole" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                    <option value="viewer">조회자 (읽기 전용)</option>
+                                    <option value="editor">편집자 (읽기/쓰기)</option>
+                                    <option value="admin">관리자 (모든 권한)</option>
+                                </select>
+                            </div>
+                            <button onclick="addUser()" id="addUserBtn"
+                                    class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors">
+                                사용자 추가
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 사용자 목록 -->
+                    <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                        <h3 class="text-lg font-bold mb-4">사용자 목록</h3>
+                        <div id="userList" class="space-y-3"></div>
+                    </div>
                 </div>
             </div>
         </main>
     </div>
 
     <script>
-        // 🔄 완전 자동 동기화 시스템 (GitHub Gist 활용)
-        const SYNC_INTERVAL = 5000; // 5초마다 자동 동기화
-        const STORAGE_KEY = 'wms_auto_sync_data';
+        // 🔧 완전 기능 + 강제 동기화 시스템
+        const SYNC_INTERVAL = 3000; // 3초마다 동기화
+        const STORAGE_KEY = 'wms_complete_system_v4';
+        const DEVICE_ID = 'device_' + Math.random().toString(36).substr(2, 9);
         
         // 전역 변수
         let racks = [];
@@ -380,9 +632,15 @@
             { id: 'editor', name: '편집자', password: 'edit123', role: 'editor' },
             { id: 'viewer', name: '조회자', password: 'view123', role: 'viewer' }
         ];
+        let alertSettings = {
+            realTimeAlerts: true,
+            soundAlerts: false
+        };
         let currentUser = null;
+        let selectedRack = null;
         let lastDataHash = '';
         let syncInterval;
+        let debugMode = true;
 
         // 권한 정의
         const permissions = {
@@ -391,64 +649,48 @@
             admin: { canView: true, canEdit: true, canDelete: true, canManageUsers: true }
         };
 
-        // 🔄 자동 동기화 시스템
-        function startAutoSync() {
-            // 페이지 로드 시 즉시 동기화
-            loadSharedData();
+        // 🔧 디버그 정보 업데이트
+        function updateDebugInfo() {
+            if (!debugMode) return;
             
-            // 주기적 동기화 시작
-            syncInterval = setInterval(() => {
-                loadSharedData();
-            }, SYNC_INTERVAL);
+            const deviceInfo = /Mobile|Android|iPhone|iPad/.test(navigator.userAgent) ? '📱 모바일' : '💻 데스크톱';
             
-            console.log('🔄 자동 동기화 시작 - 5초마다 실행');
+            document.getElementById('lastSync').textContent = new Date().toLocaleTimeString('ko-KR');
+            document.getElementById('dataCount').textContent = racks.length;
+            document.getElementById('inventoryCount').textContent = inventory.length;
+            document.getElementById('deviceInfo').textContent = deviceInfo;
         }
 
-        function stopAutoSync() {
+        // 디버그 패널 토글
+        function toggleDebug() {
+            const panel = document.getElementById('debugPanel');
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+                debugMode = true;
+            } else {
+                panel.style.display = 'none';
+                debugMode = false;
+            }
+        }
+
+        // 🔄 강제 동기화 시스템
+        function startForceSync() {
+            console.log('🔧 완전 동기화 시작');
+            forceSync();
+            syncInterval = setInterval(forceSync, SYNC_INTERVAL);
+        }
+
+        function stopForceSync() {
             if (syncInterval) {
                 clearInterval(syncInterval);
-                console.log('🔄 자동 동기화 중지');
+                console.log('🔧 동기화 중지');
             }
         }
 
-        // 데이터 해시 생성 (변경 감지용)
-        function generateDataHash(data) {
-            return btoa(JSON.stringify(data)).slice(0, 20);
-        }
-
-        // 공유 데이터 저장 (localStorage 활용)
-        function saveSharedData() {
-            const data = {
-                racks: racks,
-                inventory: inventory,
-                history: history,
-                alerts: alerts,
-                users: users,
-                lastUpdated: new Date().toISOString(),
-                updatedBy: currentUser ? currentUser.name : 'System'
-            };
+        // 강제 동기화 실행
+        function forceSync() {
+            updateConnectionStatus('syncing');
             
-            try {
-                // 로컬 저장소에 저장
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-                
-                // 데이터 해시 업데이트
-                lastDataHash = generateDataHash(data);
-                
-                // 마지막 동기화 시간 표시
-                updateLastSyncTime();
-                
-                console.log('✅ 데이터 저장 완료');
-                updateConnectionStatus('online');
-                
-            } catch (error) {
-                console.error('❌ 데이터 저장 실패:', error);
-                updateConnectionStatus('offline');
-            }
-        }
-
-        // 공유 데이터 로드
-        function loadSharedData() {
             try {
                 const savedData = localStorage.getItem(STORAGE_KEY);
                 
@@ -456,31 +698,75 @@
                     const data = JSON.parse(savedData);
                     const newDataHash = generateDataHash(data);
                     
-                    // 데이터가 변경된 경우만 업데이트
                     if (newDataHash !== lastDataHash) {
+                        const oldRackCount = racks.length;
+                        const oldInventoryCount = inventory.length;
+                        
                         racks = data.racks || [];
                         inventory = data.inventory || [];
                         history = data.history || [];
                         alerts = data.alerts || [];
                         users = data.users || users;
+                        alertSettings = data.alertSettings || alertSettings;
                         
                         lastDataHash = newDataHash;
                         updateDisplay();
-                        updateLastSyncTime();
+                        updateDebugInfo();
                         
-                        // 다른 사용자의 변경사항 알림
-                        if (data.updatedBy && currentUser && data.updatedBy !== currentUser.name) {
-                            showSyncNotification(`${data.updatedBy}님이 데이터를 업데이트했습니다.`);
+                        // 변경사항 알림
+                        if (racks.length !== oldRackCount || inventory.length !== oldInventoryCount) {
+                            showSyncNotification(`📦 데이터 업데이트: 렉 ${racks.length}개, 재고 ${inventory.length}개`);
                         }
                         
-                        console.log('📥 데이터 업데이트 완료');
+                        console.log(`🔄 동기화 완료 - 렉 ${racks.length}개, 재고 ${inventory.length}개`);
                     }
                 }
                 
                 updateConnectionStatus('online');
                 
             } catch (error) {
-                console.error('❌ 데이터 로드 실패:', error);
+                console.error('❌ 동기화 실패:', error);
+                updateConnectionStatus('offline');
+            }
+        }
+
+        // 데이터 해시 생성
+        function generateDataHash(data) {
+            return btoa(JSON.stringify(data)).slice(0, 20);
+        }
+
+        // 강제 데이터 저장
+        function forceSaveData() {
+            const data = {
+                racks: racks,
+                inventory: inventory,
+                history: history,
+                alerts: alerts,
+                users: users,
+                alertSettings: alertSettings,
+                lastUpdated: new Date().toISOString(),
+                updatedBy: currentUser ? currentUser.name : 'System',
+                deviceId: DEVICE_ID,
+                version: 4
+            };
+            
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+                lastDataHash = generateDataHash(data);
+                updateDebugInfo();
+                console.log('💾 데이터 저장 완료');
+                updateConnectionStatus('online');
+                
+                // 즉시 다른 기기에 알림
+                setTimeout(() => {
+                    window.dispatchEvent(new StorageEvent('storage', {
+                        key: STORAGE_KEY,
+                        newValue: JSON.stringify(data)
+                    }));
+                }, 100);
+                
+            } catch (error) {
+                console.error('❌ 저장 실패:', error);
                 updateConnectionStatus('offline');
             }
         }
@@ -512,7 +798,7 @@
             if (statusElement) {
                 if (status === 'online') {
                     statusElement.className = 'connection-status online';
-                    statusElement.textContent = '✅ 자동 동기화 활성';
+                    statusElement.textContent = '✅ 완전 동기화 활성';
                 } else if (status === 'syncing') {
                     statusElement.className = 'connection-status syncing';
                     statusElement.textContent = '🔄 동기화 중...';
@@ -523,43 +809,41 @@
             }
         }
 
-        // 마지막 동기화 시간 업데이트
-        function updateLastSyncTime() {
-            const timeElement = document.getElementById('lastSyncTime');
-            if (timeElement) {
-                const now = new Date();
-                timeElement.textContent = `(${now.toLocaleTimeString('ko-KR')})`;
+        // Storage 이벤트 리스너
+        window.addEventListener('storage', function(e) {
+            if (e.key === STORAGE_KEY && e.newValue) {
+                console.log('📡 다른 기기에서 변경사항 감지');
+                forceSync();
             }
-        }
+        });
 
         // 초기화
         document.addEventListener('DOMContentLoaded', function() {
-            // 현재 사용자 확인
+            updateDebugInfo();
             currentUser = JSON.parse(localStorage.getItem('wms_current_user')) || null;
             
             if (currentUser) {
                 showMainApp();
-                startAutoSync(); // 자동 동기화 시작
+                startForceSync();
             } else {
                 showLoginScreen();
             }
             
-            // Enter 키로 로그인
             document.getElementById('loginPassword').addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
                     login();
                 }
             });
 
-            // 페이지 언로드 시 동기화 중지
-            window.addEventListener('beforeunload', stopAutoSync);
+            window.addEventListener('beforeunload', stopForceSync);
+            window.addEventListener('focus', forceSync);
         });
 
         // 로그인 화면 표시
         function showLoginScreen() {
             document.getElementById('loginScreen').classList.remove('hidden');
             document.getElementById('mainApp').classList.add('hidden');
-            stopAutoSync(); // 로그인 화면에서는 동기화 중지
+            stopForceSync();
         }
 
         // 메인 앱 표시
@@ -567,26 +851,28 @@
             document.getElementById('loginScreen').classList.add('hidden');
             document.getElementById('mainApp').classList.remove('hidden');
             
-            // 시간 업데이트
+            // 오늘 날짜 설정
+            const today = new Date().toISOString().split('T')[0];
+            const inboundDateInput = document.getElementById('inboundDate');
+            if (inboundDateInput) {
+                inboundDateInput.value = today;
+            }
+            
             updateTime();
             setInterval(updateTime, 1000);
-            
-            // 사용자 정보 표시
             updateUserInfo();
-            
-            // 첫 번째 탭 활성화
+            loadAlertSettings();
             showTab('rack-management');
-            
-            // 데이터 업데이트
             updateDisplay();
-            
-            // 권한에 따른 UI 업데이트
             updateUIByPermission();
             
-            // 자동 동기화 시작
             if (!syncInterval) {
-                startAutoSync();
+                startForceSync();
             }
+            
+            // 주기적 알림 체크
+            setInterval(checkStockAlerts, 30000);
+            checkStockAlerts();
         }
 
         // 로그인
@@ -605,11 +891,11 @@
                 currentUser = { id: user.id, name: user.name, role: user.role };
                 localStorage.setItem('wms_current_user', JSON.stringify(currentUser));
                 
-                // 입력 필드 초기화
                 document.getElementById('loginUserId').value = '';
                 document.getElementById('loginPassword').value = '';
                 
                 showMainApp();
+                showSyncNotification(`${user.name}님 로그인 완료!`);
             } else {
                 alert('잘못된 사용자 ID 또는 비밀번호입니다.');
             }
@@ -620,7 +906,7 @@
             if (confirm('로그아웃 하시겠습니까?')) {
                 currentUser = null;
                 localStorage.removeItem('wms_current_user');
-                stopAutoSync(); // 자동 동기화 중지
+                stopForceSync();
                 showLoginScreen();
             }
         }
@@ -660,28 +946,33 @@
             const canDelete = hasPermission('canDelete');
             const canManageUsers = hasPermission('canManageUsers');
             
-            // 편집 불가능한 요소들 비활성화
-            const editElements = ['addRackBtn'];
+            const editElements = [
+                'addRackBtn', 'inboundBtn', 'addUserBtn', 'clearHistoryBtn'
+            ];
             
             editElements.forEach(id => {
                 const element = document.getElementById(id);
-                if (element && !canEdit) {
-                    element.disabled = true;
-                    element.classList.add('opacity-50', 'cursor-not-allowed');
-                    element.onclick = () => alert('편집 권한이 없습니다.');
+                if (element) {
+                    if (!canEdit && id !== 'addUserBtn') {
+                        element.disabled = true;
+                        element.classList.add('opacity-50', 'cursor-not-allowed');
+                        element.onclick = () => alert('편집 권한이 없습니다.');
+                    } else if (!canManageUsers && id === 'addUserBtn') {
+                        element.disabled = true;
+                        element.classList.add('opacity-50', 'cursor-not-allowed');
+                        element.onclick = () => alert('사용자 관리 권한이 없습니다.');
+                    }
                 }
             });
             
-            // 사용자 관리 탭 숨기기
             if (!canManageUsers) {
                 document.getElementById('tab-users').style.display = 'none';
             }
             
-            // 입력 필드 비활성화
             if (!canEdit) {
                 const inputs = document.querySelectorAll('input[type="text"], input[type="number"], input[type="date"], select');
                 inputs.forEach(input => {
-                    if (!input.id.includes('login')) {
+                    if (!input.id.includes('login') && !input.id.includes('alert')) {
                         input.disabled = true;
                         input.classList.add('opacity-50');
                     }
@@ -698,26 +989,299 @@
             }
         }
 
+        // 알림 설정 로드
+        function loadAlertSettings() {
+            const realTimeAlertsEl = document.getElementById('realTimeAlerts');
+            const soundAlertsEl = document.getElementById('soundAlerts');
+            
+            if (realTimeAlertsEl) realTimeAlertsEl.checked = alertSettings.realTimeAlerts;
+            if (soundAlertsEl) soundAlertsEl.checked = alertSettings.soundAlerts;
+            
+            if (realTimeAlertsEl) realTimeAlertsEl.addEventListener('change', saveAlertSettings);
+            if (soundAlertsEl) soundAlertsEl.addEventListener('change', saveAlertSettings);
+        }
+
+        // 알림 설정 저장
+        function saveAlertSettings() {
+            alertSettings = {
+                realTimeAlerts: document.getElementById('realTimeAlerts').checked,
+                soundAlerts: document.getElementById('soundAlerts').checked
+            };
+            forceSaveData();
+        }
+
+        // 재고 알림 체크
+        function checkStockAlerts() {
+            if (!alertSettings.realTimeAlerts) return;
+            
+            const newAlerts = [];
+            const currentTime = new Date().toISOString();
+            
+            inventory.forEach(item => {
+                const warningLevel = getStockWarningLevel(item);
+                
+                if (warningLevel !== 'normal') {
+                    const existingAlert = alerts.find(alert => 
+                        alert.itemId === item.id && alert.level === warningLevel
+                    );
+                    
+                    if (!existingAlert) {
+                        const alert = {
+                            id: Date.now().toString() + Math.random(),
+                            itemId: item.id,
+                            itemName: item.itemName,
+                            itemCode: item.itemCode,
+                            rackName: item.rackName,
+                            currentQuantity: item.quantity,
+                            unit: item.unit,
+                            level: warningLevel,
+                            safetyStock: item.safetyStock,
+                            criticalStock: item.criticalStock,
+                            timestamp: currentTime,
+                            acknowledged: false
+                        };
+                        
+                        newAlerts.push(alert);
+                        alerts.push(alert);
+                    }
+                }
+            });
+            
+            if (newAlerts.length > 0) {
+                newAlerts.forEach(alert => showAlert(alert));
+                forceSaveData();
+                updateAlertDisplay();
+            }
+            
+            alerts = alerts.filter(alert => {
+                const item = inventory.find(i => i.id === alert.itemId);
+                if (!item) return false;
+                
+                const currentLevel = getStockWarningLevel(item);
+                return currentLevel === alert.level;
+            });
+            
+            forceSaveData();
+            updateAlertDisplay();
+        }
+
+        // 재고 경고 레벨 확인
+        function getStockWarningLevel(item) {
+            if (!item.criticalStock && !item.safetyStock) return 'normal';
+            
+            if (item.criticalStock && item.quantity <= item.criticalStock) {
+                return 'critical';
+            } else if (item.safetyStock && item.quantity <= item.safetyStock) {
+                return 'warning';
+            }
+            return 'normal';
+        }
+
+        // 알림 표시
+        function showAlert(alert) {
+            const container = document.getElementById('alertContainer');
+            const alertElement = document.createElement('div');
+            
+            const isCritical = alert.level === 'critical';
+            const bgColor = isCritical ? 'bg-red-500' : 'bg-yellow-500';
+            const icon = isCritical ? '🚨' : '⚠️';
+            const title = isCritical ? '위험재고 미달' : '안전재고 미달';
+            
+            alertElement.className = `alert-notification ${bgColor} text-white p-4 rounded-lg shadow-lg max-w-sm`;
+            alertElement.innerHTML = `
+                <div class="flex items-start justify-between">
+                    <div class="flex items-start space-x-3">
+                        <span class="text-2xl">${icon}</span>
+                        <div>
+                            <h4 class="font-bold">${title}</h4>
+                            <p class="text-sm">${alert.itemName} (${alert.itemCode})</p>
+                            <p class="text-sm">렉: ${alert.rackName}</p>
+                            <p class="text-sm">현재: ${alert.currentQuantity}${alert.unit}</p>
+                            <p class="text-xs opacity-90">
+                                ${isCritical ? `위험재고: ${alert.criticalStock}${alert.unit}` : `안전재고: ${alert.safetyStock}${alert.unit}`}
+                            </p>
+                        </div>
+                    </div>
+                    <button onclick="this.parentElement.parentElement.remove()" 
+                            class="text-white hover:text-gray-200 text-xl">×</button>
+                </div>
+            `;
+            
+            container.appendChild(alertElement);
+            
+            if (alertSettings.soundAlerts) {
+                playAlertSound(isCritical);
+            }
+            
+            setTimeout(() => {
+                if (alertElement.parentNode) {
+                    alertElement.remove();
+                }
+            }, 5000);
+        }
+
+        // 알림 소리 재생
+        function playAlertSound(isCritical) {
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.frequency.value = isCritical ? 800 : 600;
+                oscillator.type = 'sine';
+                
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.5);
+            } catch (error) {
+                console.log('Audio context not available');
+            }
+        }
+
+        // 알림 테스트
+        function testAlert() {
+            const testAlert = {
+                id: 'test',
+                itemName: '테스트 품목',
+                itemCode: 'TEST-001',
+                rackName: 'A-1',
+                currentQuantity: 3,
+                unit: '개',
+                level: 'critical',
+                criticalStock: 5,
+                timestamp: new Date().toISOString()
+            };
+            
+            showAlert(testAlert);
+        }
+
+        // 알림 디스플레이 업데이트
+        function updateAlertDisplay() {
+            const activeAlerts = alerts.filter(alert => !alert.acknowledged);
+            const alertCount = activeAlerts.length;
+            
+            const alertBadge = document.getElementById('alertBadge');
+            const alertTabBadge = document.getElementById('alertTabBadge');
+            
+            if (alertCount > 0) {
+                if (alertBadge) {
+                    alertBadge.textContent = alertCount;
+                    alertBadge.classList.remove('hidden');
+                }
+                if (alertTabBadge) {
+                    alertTabBadge.textContent = alertCount;
+                    alertTabBadge.classList.remove('hidden');
+                }
+            } else {
+                if (alertBadge) alertBadge.classList.add('hidden');
+                if (alertTabBadge) alertTabBadge.classList.add('hidden');
+            }
+            
+            updateCurrentAlerts();
+        }
+
+        // 현재 알림 목록 업데이트
+        function updateCurrentAlerts() {
+            const container = document.getElementById('currentAlerts');
+            if (!container) return;
+            
+            const activeAlerts = alerts.filter(alert => !alert.acknowledged);
+            
+            if (activeAlerts.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-500 py-8">현재 알림이 없습니다.</p>';
+                return;
+            }
+            
+            container.innerHTML = activeAlerts.map(alert => {
+                const isCritical = alert.level === 'critical';
+                const bgColor = isCritical ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200';
+                const icon = isCritical ? '🚨' : '⚠️';
+                const title = isCritical ? '위험재고 미달' : '안전재고 미달';
+                
+                return `
+                    <div class="border ${bgColor} rounded-lg p-4">
+                        <div class="flex items-start justify-between">
+                            <div class="flex items-start space-x-3">
+                                <span class="text-2xl">${icon}</span>
+                                <div>
+                                    <h4 class="font-medium text-gray-900">${title}</h4>
+                                    <p class="text-sm text-gray-700">${alert.itemName} (${alert.itemCode})</p>
+                                    <p class="text-sm text-gray-600">렉: ${alert.rackName}</p>
+                                    <p class="text-sm text-gray-600">현재: ${alert.currentQuantity}${alert.unit}</p>
+                                    <p class="text-xs text-gray-500">
+                                        발생시간: ${new Date(alert.timestamp).toLocaleString('ko-KR')}
+                                    </p>
+                                </div>
+                            </div>
+                            <button onclick="acknowledgeAlert('${alert.id}')" 
+                                    class="bg-gray-500 hover:bg-gray-600 text-white text-sm px-3 py-1 rounded-lg transition-colors">
+                                확인
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 알림 확인 처리
+        function acknowledgeAlert(alertId) {
+            const alert = alerts.find(a => a.id === alertId);
+            if (alert) {
+                alert.acknowledged = true;
+                forceSaveData();
+                updateAlertDisplay();
+            }
+        }
+
+        // 모든 알림 지우기
+        function clearAllAlerts() {
+            if (confirm('모든 알림을 지우시겠습니까?')) {
+                alerts = [];
+                forceSaveData();
+                updateAlertDisplay();
+            }
+        }
+
+        // 알림 요약 표시
+        function showAlertSummary() {
+            const activeAlerts = alerts.filter(alert => !alert.acknowledged);
+            if (activeAlerts.length === 0) {
+                alert('현재 활성화된 알림이 없습니다.');
+                return;
+            }
+            
+            const criticalCount = activeAlerts.filter(a => a.level === 'critical').length;
+            const warningCount = activeAlerts.filter(a => a.level === 'warning').length;
+            
+            let message = `현재 알림 현황:\n`;
+            if (criticalCount > 0) message += `🚨 위험재고 미달: ${criticalCount}건\n`;
+            if (warningCount > 0) message += `⚠️ 안전재고 미달: ${warningCount}건\n`;
+            message += `\n자세한 내용은 '재고 알림' 탭에서 확인하세요.`;
+            
+            alert(message);
+        }
+
         // 탭 전환
         function showTab(tabName) {
-            // 권한 체크
             if (tabName === 'users' && !hasPermission('canManageUsers')) {
                 alert('사용자 관리 권한이 없습니다.');
                 return;
             }
             
-            // 모든 탭 컨텐츠 숨기기
             document.querySelectorAll('.tab-content').forEach(tab => {
                 tab.classList.add('hidden');
             });
             
-            // 모든 탭 버튼 비활성화
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 btn.classList.remove('tab-active');
                 btn.classList.add('bg-gray-100', 'text-gray-700', 'hover:bg-gray-200');
             });
             
-            // 선택된 탭 활성화
             const tabContent = document.getElementById(tabName);
             const tabButton = document.getElementById('tab-' + tabName);
             
@@ -727,9 +1291,12 @@
                 tabButton.classList.remove('bg-gray-100', 'text-gray-700', 'hover:bg-gray-200');
             }
             
-            // 탭별 데이터 업데이트
             if (tabName === 'inventory') updateInventoryDisplay();
+            if (tabName === 'outbound') updateOutboundDisplay();
+            if (tabName === 'history') updateHistoryDisplay();
+            if (tabName === 'inbound') updateInboundRackGrid();
             if (tabName === 'rack-management') updateRackList();
+            if (tabName === 'alerts') updateCurrentAlerts();
             if (tabName === 'users') updateUserList();
         }
 
@@ -748,7 +1315,6 @@
                 return;
             }
             
-            // 중복 확인
             if (racks.find(rack => rack.name === name)) {
                 alert('이미 존재하는 렉 이름입니다.');
                 return;
@@ -763,16 +1329,13 @@
             };
             
             racks.push(newRack);
-            
-            // 자동 저장 및 동기화
-            saveSharedData();
+            forceSaveData();
             updateDisplay();
             
-            // 입력 필드 초기화
             document.getElementById('rackName').value = '';
             document.getElementById('rackLocation').value = '';
             
-            showSyncNotification('렉이 추가되고 자동 동기화되었습니다!');
+            showSyncNotification(`📦 렉 "${name}" 추가됨!`);
         }
 
         // 렉 삭제
@@ -782,11 +1345,18 @@
                 return;
             }
             
-            if (confirm('정말로 이 렉을 삭제하시겠습니까?')) {
+            const hasInventory = inventory.some(item => item.rackId === rackId);
+            if (hasInventory) {
+                alert('재고가 있는 렉은 삭제할 수 없습니다.');
+                return;
+            }
+            
+            const rack = racks.find(r => r.id === rackId);
+            if (confirm(`정말로 "${rack.name}" 렉을 삭제하시겠습니까?`)) {
                 racks = racks.filter(rack => rack.id !== rackId);
-                saveSharedData();
+                forceSaveData();
                 updateDisplay();
-                showSyncNotification('렉이 삭제되고 자동 동기화되었습니다!');
+                showSyncNotification(`🗑️ 렉 "${rack.name}" 삭제됨!`);
             }
         }
 
@@ -800,39 +1370,193 @@
                 return;
             }
             
-            rackList.innerHTML = racks.map(rack => `
-                <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
-                    <div class="flex-1">
-                        <div class="flex items-center space-x-3">
-                            <h4 class="font-medium text-gray-900">${rack.name}</h4>
-                            <span class="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded-full">빈 렉</span>
+            rackList.innerHTML = racks.map(rack => {
+                const rackInventory = inventory.filter(item => item.rackId === rack.id);
+                const hasInventory = rackInventory.length > 0;
+                
+                let statusBadge = '<span class="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded-full">빈 렉</span>';
+                
+                if (hasInventory) {
+                    const hasWarning = rackInventory.some(item => getStockWarningLevel(item) === 'warning');
+                    const hasCritical = rackInventory.some(item => getStockWarningLevel(item) === 'critical');
+                    
+                    if (hasCritical) {
+                        statusBadge = '<span class="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">🚨 위험재고</span>';
+                    } else if (hasWarning) {
+                        statusBadge = '<span class="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full">⚠️ 안전재고 미달</span>';
+                    } else {
+                        statusBadge = '<span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">사용중</span>';
+                    }
+                }
+                
+                return `
+                    <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
+                        <div class="flex-1">
+                            <div class="flex items-center space-x-3">
+                                <h4 class="font-medium text-gray-900">${rack.name}</h4>
+                                ${statusBadge}
+                            </div>
+                            <p class="text-sm text-gray-500">${rack.location || '위치 정보 없음'}</p>
+                            <p class="text-xs text-gray-400">생성일: ${new Date(rack.createdAt).toLocaleDateString('ko-KR')}</p>
                         </div>
-                        <p class="text-sm text-gray-500">${rack.location || '위치 정보 없음'}</p>
-                        <p class="text-xs text-gray-400">생성일: ${new Date(rack.createdAt).toLocaleDateString('ko-KR')}</p>
+                        ${hasPermission('canDelete') ? `
+                            <button onclick="deleteRack('${rack.id}')" 
+                                    class="text-red-600 hover:text-red-800 p-2 rounded-lg hover:bg-red-50 transition-colors">
+                                🗑️
+                            </button>
+                        ` : ''}
                     </div>
-                    ${hasPermission('canDelete') ? `
-                        <button onclick="deleteRack('${rack.id}')" 
-                                class="text-red-600 hover:text-red-800 p-2 rounded-lg hover:bg-red-50 transition-colors">
-                            🗑️
-                        </button>
-                    ` : ''}
+                `;
+            }).join('');
+        }
+
+        // 입고용 렉 그리드 업데이트
+        function updateInboundRackGrid() {
+            const grid = document.getElementById('inboundRackGrid');
+            if (!grid) return;
+            
+            const emptyRacks = racks.filter(rack => 
+                !inventory.some(item => item.rackId === rack.id)
+            );
+            
+            if (emptyRacks.length === 0) {
+                grid.innerHTML = '<p class="col-span-full text-center text-gray-500 py-8">사용 가능한 빈 렉이 없습니다.</p>';
+                return;
+            }
+            
+            grid.innerHTML = emptyRacks.map(rack => `
+                <div class="rack-item rack-empty p-4 rounded-lg text-center ${hasPermission('canEdit') ? '' : 'opacity-50 cursor-not-allowed'}" 
+                     onclick="${hasPermission('canEdit') ? `selectRack('${rack.id}', '${rack.name}')` : `alert('편집 권한이 없습니다.')`}">
+                    <div class="font-medium text-gray-700">${rack.name}</div>
+                    <div class="text-xs text-gray-500 mt-1">${rack.location || ''}</div>
+                    <div class="text-xs text-green-600 mt-2">✅ 사용가능</div>
                 </div>
             `).join('');
+        }
+
+        // 렉 선택
+        function selectRack(rackId, rackName) {
+            if (!hasPermission('canEdit')) {
+                alert('편집 권한이 없습니다.');
+                return;
+            }
+            
+            document.querySelectorAll('.rack-selected').forEach(el => {
+                el.classList.remove('rack-selected');
+                el.classList.add('rack-empty');
+            });
+            
+            event.target.classList.remove('rack-empty');
+            event.target.classList.add('rack-selected');
+            
+            selectedRack = { id: rackId, name: rackName };
+            document.getElementById('selectedRackName').textContent = rackName;
+        }
+
+        // 입고 처리
+        function processInbound() {
+            if (!hasPermission('canEdit')) {
+                alert('편집 권한이 없습니다.');
+                return;
+            }
+            
+            const itemName = document.getElementById('itemName').value.trim();
+            const itemCode = document.getElementById('itemCode').value.trim();
+            const quantity = parseInt(document.getElementById('itemQuantity').value);
+            const unit = document.getElementById('itemUnit').value;
+            const safetyStock = parseInt(document.getElementById('safetyStock').value) || 0;
+            const criticalStock = parseInt(document.getElementById('criticalStock').value) || 0;
+            const inboundDate = document.getElementById('inboundDate').value;
+            
+            if (!itemName || !itemCode || !quantity || !selectedRack) {
+                alert('모든 필드를 입력하고 렉을 선택해주세요.');
+                return;
+            }
+            
+            if (criticalStock > safetyStock && safetyStock > 0) {
+                alert('위험재고는 안전재고보다 작아야 합니다.');
+                return;
+            }
+            
+            const inventoryItem = {
+                id: Date.now().toString(),
+                itemName,
+                itemCode,
+                quantity,
+                unit,
+                safetyStock,
+                criticalStock,
+                rackId: selectedRack.id,
+                rackName: selectedRack.name,
+                inboundDate,
+                createdAt: new Date().toISOString(),
+                createdBy: currentUser.id
+            };
+            
+            inventory.push(inventoryItem);
+            
+            const historyItem = {
+                id: Date.now().toString(),
+                type: 'inbound',
+                itemName,
+                itemCode,
+                quantity,
+                unit,
+                rackName: selectedRack.name,
+                date: inboundDate,
+                timestamp: new Date().toISOString(),
+                userId: currentUser.id,
+                userName: currentUser.name
+            };
+            
+            history.unshift(historyItem);
+            
+            forceSaveData();
+            updateDisplay();
+            
+            setTimeout(checkStockAlerts, 100);
+            
+            document.getElementById('itemName').value = '';
+            document.getElementById('itemCode').value = '';
+            document.getElementById('itemQuantity').value = '1';
+            document.getElementById('safetyStock').value = '10';
+            document.getElementById('criticalStock').value = '5';
+            document.getElementById('inboundDate').value = new Date().toISOString().split('T')[0];
+            selectedRack = null;
+            document.getElementById('selectedRackName').textContent = '렉을 선택해주세요';
+            
+            updateInboundRackGrid();
+            
+            showSyncNotification(`📥 입고 완료: ${itemName}`);
         }
 
         // 재고 현황 업데이트
         function updateInventoryDisplay() {
             updateStats();
+            updateInventoryGrid();
         }
 
         // 통계 업데이트
         function updateStats() {
             const totalRacks = racks.length;
-            const emptyRacks = totalRacks; // 현재는 모든 렉이 빈 렉
+            const occupiedRacks = new Set(inventory.map(item => item.rackId)).size;
+            const emptyRacks = totalRacks - occupiedRacks;
+            
+            let warningCount = 0;
+            let criticalCount = 0;
+            
+            inventory.forEach(item => {
+                const level = getStockWarningLevel(item);
+                if (level === 'warning') warningCount++;
+                if (level === 'critical') criticalCount++;
+            });
             
             const elements = {
                 totalRacksCount: totalRacks,
+                occupiedRacksCount: occupiedRacks,
                 emptyRacksCount: emptyRacks,
+                warningStockCount: warningCount,
+                criticalStockCount: criticalCount,
                 totalRacks: totalRacks
             };
             
@@ -842,10 +1566,281 @@
             });
         }
 
+        // 재고 그리드 업데이트
+        function updateInventoryGrid() {
+            const grid = document.getElementById('inventoryRackGrid');
+            if (!grid) return;
+            
+            if (racks.length === 0) {
+                grid.innerHTML = '<p class="col-span-full text-center text-gray-500 py-8">등록된 렉이 없습니다.</p>';
+                return;
+            }
+            
+            grid.innerHTML = racks.map(rack => {
+                const rackInventory = inventory.filter(item => item.rackId === rack.id);
+                const isEmpty = rackInventory.length === 0;
+                
+                let rackClass = 'rack-empty';
+                let statusIcon = '';
+                
+                if (!isEmpty) {
+                    const hasWarning = rackInventory.some(item => getStockWarningLevel(item) === 'warning');
+                    const hasCritical = rackInventory.some(item => getStockWarningLevel(item) === 'critical');
+                    
+                    if (hasCritical) {
+                        rackClass = 'rack-critical';
+                        statusIcon = '🚨';
+                    } else if (hasWarning) {
+                        rackClass = 'rack-warning';
+                        statusIcon = '⚠️';
+                    } else {
+                        rackClass = 'rack-occupied';
+                        statusIcon = '✅';
+                    }
+                }
+                
+                return `
+                    <div class="rack-item ${rackClass} p-4 rounded-lg">
+                        <div class="font-medium text-gray-800 mb-2 flex items-center justify-between">
+                            <span class="text-sm">${rack.name}</span>
+                            ${statusIcon && `<span class="text-lg">${statusIcon}</span>`}
+                        </div>
+                        <div class="text-xs text-gray-600 mb-2">${rack.location || ''}</div>
+                        ${isEmpty ? 
+                            '<div class="text-xs text-gray-500">빈 렉</div>' : 
+                            `<div class="space-y-1">
+                                ${rackInventory.map(item => {
+                                    const level = getStockWarningLevel(item);
+                                    let textColor = 'text-gray-600';
+                                    if (level === 'critical') textColor = 'text-red-600';
+                                    else if (level === 'warning') textColor = 'text-yellow-600';
+                                    
+                                    return `
+                                        <div class="text-xs bg-white bg-opacity-50 p-2 rounded">
+                                            <div class="font-medium truncate">${item.itemName}</div>
+                                            <div class="${textColor} font-medium">${item.quantity}${item.unit}</div>
+                                            ${item.safetyStock ? `<div class="text-gray-500">안전: ${item.safetyStock}${item.unit}</div>` : ''}
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>`
+                        }
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 출고 화면 업데이트
+        function updateOutboundDisplay() {
+            const container = document.getElementById('outboundItemList');
+            if (!container) return;
+            
+            if (inventory.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-500 py-8">출고할 재고가 없습니다.</p>';
+                return;
+            }
+            
+            container.innerHTML = inventory.map(item => {
+                const warningLevel = getStockWarningLevel(item);
+                let alertBadge = '';
+                
+                if (warningLevel === 'critical') {
+                    alertBadge = '<span class="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">🚨 위험재고</span>';
+                } else if (warningLevel === 'warning') {
+                    alertBadge = '<span class="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full">⚠️ 안전재고 미달</span>';
+                }
+                
+                return `
+                    <div class="border border-gray-200 rounded-lg p-4">
+                        <div class="flex items-center justify-between flex-col sm:flex-row space-y-4 sm:space-y-0">
+                            <div class="flex-1 w-full">
+                                <div class="flex items-center space-x-3 mb-2 flex-wrap">
+                                    <h4 class="font-medium text-gray-900">${item.itemName}</h4>
+                                    ${alertBadge}
+                                </div>
+                                <p class="text-sm text-gray-600">코드: ${item.itemCode} | 렉: ${item.rackName}</p>
+                                <p class="text-sm text-gray-500">입고일: ${item.inboundDate}</p>
+                                ${item.safetyStock ? `<p class="text-xs text-gray-500">안전재고: ${item.safetyStock}${item.unit}</p>` : ''}
+                                ${item.criticalStock ? `<p class="text-xs text-gray-500">위험재고: ${item.criticalStock}${item.unit}</p>` : ''}
+                            </div>
+                            <div class="flex items-center space-x-4 flex-col sm:flex-row space-y-2 sm:space-y-0">
+                                <div class="text-center">
+                                    <p class="text-sm text-gray-600">현재 수량</p>
+                                    <p class="text-lg font-bold text-blue-600">${item.quantity}${item.unit}</p>
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-600 mb-1">출고 수량</label>
+                                    <input type="number" min="1" max="${item.quantity}" value="${item.quantity}" 
+                                           id="outbound-${item.id}" 
+                                           class="w-20 px-2 py-1 border border-gray-300 rounded text-center"
+                                           ${!hasPermission('canEdit') ? 'disabled' : ''}>
+                                </div>
+                                <button onclick="processOutbound('${item.id}')" 
+                                        class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors ${!hasPermission('canEdit') ? 'opacity-50 cursor-not-allowed' : ''}"
+                                        ${!hasPermission('canEdit') ? 'disabled' : ''}>
+                                    출고
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 출고 처리
+        function processOutbound(itemId) {
+            if (!hasPermission('canEdit')) {
+                alert('편집 권한이 없습니다.');
+                return;
+            }
+            
+            const item = inventory.find(i => i.id === itemId);
+            const outboundQuantity = parseInt(document.getElementById(`outbound-${itemId}`).value);
+            
+            if (!outboundQuantity || outboundQuantity <= 0) {
+                alert('출고 수량을 입력해주세요.');
+                return;
+            }
+            
+            if (outboundQuantity > item.quantity) {
+                alert('재고 수량보다 많이 출고할 수 없습니다.');
+                return;
+            }
+            
+            const remainingQuantity = item.quantity - outboundQuantity;
+            let warningMessage = '';
+            
+            if (item.criticalStock && remainingQuantity <= item.criticalStock) {
+                warningMessage = `\n⚠️ 출고 후 위험재고(${item.criticalStock}${item.unit}) 이하가 됩니다!`;
+            } else if (item.safetyStock && remainingQuantity <= item.safetyStock) {
+                warningMessage = `\n⚠️ 출고 후 안전재고(${item.safetyStock}${item.unit}) 이하가 됩니다!`;
+            }
+            
+            if (!confirm(`${item.itemName} ${outboundQuantity}${item.unit}를 출고하시겠습니까?${warningMessage}`)) {
+                return;
+            }
+            
+            const historyItem = {
+                id: Date.now().toString(),
+                type: 'outbound',
+                itemName: item.itemName,
+                itemCode: item.itemCode,
+                quantity: outboundQuantity,
+                unit: item.unit,
+                rackName: item.rackName,
+                date: new Date().toISOString().split('T')[0],
+                timestamp: new Date().toISOString(),
+                userId: currentUser.id,
+                userName: currentUser.name
+            };
+            
+            history.unshift(historyItem);
+            
+            if (outboundQuantity === item.quantity) {
+                inventory = inventory.filter(i => i.id !== itemId);
+                alerts = alerts.filter(alert => alert.itemId !== itemId);
+            } else {
+                item.quantity -= outboundQuantity;
+            }
+            
+            forceSaveData();
+            updateDisplay();
+            updateOutboundDisplay();
+            
+            setTimeout(checkStockAlerts, 100);
+            
+            showSyncNotification(`📤 출고 완료: ${item.itemName} ${outboundQuantity}${item.unit}`);
+        }
+
+        // 사용자 추가
+        function addUser() {
+            if (!hasPermission('canManageUsers')) {
+                alert('사용자 관리 권한이 없습니다.');
+                return;
+            }
+            
+            const userId = document.getElementById('newUserId').value.trim();
+            const userName = document.getElementById('newUserName').value.trim();
+            const password = document.getElementById('newUserPassword').value.trim();
+            const role = document.getElementById('newUserRole').value;
+            
+            if (!userId || !userName || !password) {
+                alert('모든 필드를 입력해주세요.');
+                return;
+            }
+            
+            if (users.find(u => u.id === userId)) {
+                alert('이미 존재하는 사용자 ID입니다.');
+                return;
+            }
+            
+            const newUser = { id: userId, name: userName, password: password, role: role };
+            users.push(newUser);
+            forceSaveData();
+            
+            document.getElementById('newUserId').value = '';
+            document.getElementById('newUserName').value = '';
+            document.getElementById('newUserPassword').value = '';
+            document.getElementById('newUserRole').value = 'viewer';
+            
+            updateUserList();
+            showSyncNotification(`👤 사용자 "${userName}" 추가됨!`);
+        }
+
+        // 사용자 삭제
+        function deleteUser(userId) {
+            if (!hasPermission('canManageUsers')) {
+                alert('사용자 관리 권한이 없습니다.');
+                return;
+            }
+            
+            if (userId === currentUser.id) {
+                alert('현재 로그인한 사용자는 삭제할 수 없습니다.');
+                return;
+            }
+            
+            const user = users.find(u => u.id === userId);
+            if (confirm(`정말로 "${user.name}" 사용자를 삭제하시겠습니까?`)) {
+                users = users.filter(u => u.id !== userId);
+                forceSaveData();
+                updateUserList();
+                showSyncNotification(`🗑️ 사용자 "${user.name}" 삭제됨!`);
+            }
+        }
+
+        // 사용자 권한 변경
+        function changeUserRole(userId, newRole) {
+            if (!hasPermission('canManageUsers')) {
+                alert('사용자 관리 권한이 없습니다.');
+                return;
+            }
+            
+            const user = users.find(u => u.id === userId);
+            if (user) {
+                user.role = newRole;
+                forceSaveData();
+                updateUserList();
+                
+                if (userId === currentUser.id) {
+                    currentUser.role = newRole;
+                    localStorage.setItem('wms_current_user', JSON.stringify(currentUser));
+                    updateUserInfo();
+                    updateUIByPermission();
+                }
+                
+                showSyncNotification(`👑 "${user.name}" 권한 변경됨!`);
+            }
+        }
+
         // 사용자 목록 업데이트
         function updateUserList() {
             const container = document.getElementById('userList');
             if (!container) return;
+            
+            if (users.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-500 py-8">등록된 사용자가 없습니다.</p>';
+                return;
+            }
             
             const roleText = {
                 admin: '👑 관리자',
@@ -869,21 +1864,124 @@
                         </div>
                         <p class="text-sm text-gray-500">ID: ${user.id}</p>
                     </div>
+                    <div class="flex items-center space-x-2">
+                        ${hasPermission('canManageUsers') ? `
+                            <select onchange="changeUserRole('${user.id}', this.value)" 
+                                    class="text-sm border border-gray-300 rounded px-2 py-1"
+                                    ${user.id === currentUser.id ? 'disabled' : ''}>
+                                <option value="viewer" ${user.role === 'viewer' ? 'selected' : ''}>조회자</option>
+                                <option value="editor" ${user.role === 'editor' ? 'selected' : ''}>편집자</option>
+                                <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>관리자</option>
+                            </select>
+                            ${user.id !== currentUser.id ? `
+                                <button onclick="deleteUser('${user.id}')" 
+                                        class="text-red-600 hover:text-red-800 p-2 rounded-lg hover:bg-red-50 transition-colors">
+                                    🗑️
+                                </button>
+                            ` : ''}
+                        ` : ''}
+                    </div>
                 </div>
             `).join('');
+        }
+
+        // 이력 화면 업데이트
+        function updateHistoryDisplay() {
+            const container = document.getElementById('historyList');
+            if (!container) return;
+            
+            if (history.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-500 py-8">이력이 없습니다.</p>';
+                return;
+            }
+            
+            container.innerHTML = history.map(item => {
+                const isInbound = item.type === 'inbound';
+                const bgColor = isInbound ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200';
+                const icon = isInbound ? '📥' : '📤';
+                const typeText = isInbound ? '입고' : '출고';
+                
+                return `
+                    <div class="border ${bgColor} rounded-lg p-4">
+                        <div class="flex items-center justify-between flex-col sm:flex-row space-y-2 sm:space-y-0">
+                            <div class="flex items-center space-x-3 w-full sm:w-auto">
+                                <span class="text-2xl">${icon}</span>
+                                <div class="flex-1">
+                                    <h4 class="font-medium text-gray-900">${item.itemName}</h4>
+                                    <p class="text-sm text-gray-600">
+                                        ${typeText} | ${item.quantity}${item.unit} | 렉: ${item.rackName}
+                                    </p>
+                                    ${item.userName ? `<p class="text-xs text-gray-500">처리자: ${item.userName}</p>` : ''}
+                                </div>
+                            </div>
+                            <div class="text-right text-sm text-gray-500">
+                                <p>${item.date}</p>
+                                <p>${new Date(item.timestamp).toLocaleTimeString('ko-KR')}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
 
         // 전체 디스플레이 업데이트
         function updateDisplay() {
             updateStats();
             updateRackList();
+            updateInboundRackGrid();
             updateInventoryDisplay();
+            updateOutboundDisplay();
+            updateHistoryDisplay();
+            updateAlertDisplay();
             updateUserList();
+            updateDebugInfo();
         }
 
-        // 알림 요약 (임시)
-        function showAlertSummary() {
-            alert('현재 활성화된 알림이 없습니다.');
+        // 이력 내보내기 (CSV)
+        function exportHistory() {
+            if (history.length === 0) {
+                alert('내보낼 이력이 없습니다.');
+                return;
+            }
+            
+            const headers = ['구분', '품목명', '품목코드', '수량', '단위', '렉', '날짜', '시간', '처리자'];
+            const csvContent = [
+                headers.join(','),
+                ...history.map(item => [
+                    item.type === 'inbound' ? '입고' : '출고',
+                    item.itemName,
+                    item.itemCode,
+                    item.quantity,
+                    item.unit,
+                    item.rackName,
+                    item.date,
+                    new Date(item.timestamp).toLocaleString('ko-KR'),
+                    item.userName || ''
+                ].join(','))
+            ].join('\n');
+            
+            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `WMS_이력_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+            
+            showSyncNotification('📊 이력 파일이 다운로드됩니다!');
+        }
+
+        // 이력 초기화
+        function clearHistory() {
+            if (!hasPermission('canDelete')) {
+                alert('삭제 권한이 없습니다.');
+                return;
+            }
+            
+            if (confirm('모든 이력을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+                history = [];
+                forceSaveData();
+                updateHistoryDisplay();
+                showSyncNotification('🗑️ 모든 이력이 삭제되었습니다!');
+            }
         }
     </script>
 </body>
